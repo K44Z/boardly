@@ -7,11 +7,28 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/K44Z/boardly/schemas"
+	"github.com/K44Z/boardly/shared/schemas"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pressly/goose/v3"
 )
+
+func SetupApp() (*fiber.App, *schemas.DB) {
+	config := &schemas.Config{
+		DbUrl: "postgres://test:test@localhost:5432/test?sslmode=disable",
+	}
+	app := fiber.New()
+
+	db, err := ConnectDb(config)
+	if err != nil {
+		log.Fatalf("failed to connect to database: %v", err)
+	}
+	err = CleanTables(db.Pool)
+	if err != nil {
+		log.Fatal("error cleaning tables ")
+	}
+	return app, db
+}
 
 func ConnectDb(c *schemas.Config) (*schemas.DB, error) {
 	RunMigrations(c.DbUrl)
@@ -41,23 +58,6 @@ func RunMigrations(connStr string) {
 	}
 
 	log.Println("Migrations applied successfully")
-}
-
-func SetupApp() (*fiber.App, *schemas.DB) {
-	config := &schemas.Config{
-		DbUrl: "postgres://test:test@localhost:5432/test?sslmode=disable",
-	}
-	app := fiber.New()
-
-	db, err := ConnectDb(config)
-	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
-	}
-	err = CleanTables(db.Pool)
-	if err != nil {
-		log.Fatal("error cleaning tables ")
-	}
-	return app, db
 }
 
 var tablesToClean = []string{

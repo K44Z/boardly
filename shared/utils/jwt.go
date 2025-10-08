@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/K44Z/boardly/schemas"
+	"github.com/K44Z/boardly/shared/schemas"
 	"github.com/golang-jwt/jwt/v4"
 )
 
@@ -25,7 +25,7 @@ func GenerateJWTtoken(user *schemas.User) (string, error) {
 
 func Authenticate(tokenString string) (*schemas.User, error) {
 	JWT_SECRET := os.Getenv("JWT_SECRET")
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}

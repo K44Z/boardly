@@ -7,9 +7,8 @@ import (
 )
 
 func NewUserRouter(app *fiber.App, s *services.UserService) {
-	app.Group("/api/user")
-
 	handler := handlers.NewUserHandler(s)
-	app.Post("/login", handler.Login)
-	app.Post("/register", handler.Register)
+	user := app.Group("/api/user")
+	user.Post("/login", handler.Login)
+	user.Post("/register", handler.Register)
 }

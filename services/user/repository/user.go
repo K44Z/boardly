@@ -5,8 +5,9 @@ import (
 	"errors"
 
 	sqlc "github.com/K44Z/boardly/database/generated"
-	"github.com/K44Z/boardly/schemas"
-	"github.com/K44Z/boardly/services/user/utils"
+	"github.com/K44Z/boardly/shared/schemas"
+
+	"github.com/K44Z/boardly/shared/utils"
 	"github.com/jackc/pgx/v5"
 )
 

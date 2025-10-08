@@ -5,9 +5,9 @@ import (
 	"os"
 
 	"github.com/K44Z/boardly/database"
-	"github.com/K44Z/boardly/schemas"
-	userRoutes "github.com/K44Z/boardly/services/user/routes"
+	"github.com/K44Z/boardly/services/user/routes"
 	"github.com/K44Z/boardly/services/user/services"
+	"github.com/K44Z/boardly/shared/schemas"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 
@@ -33,9 +33,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	UserService := services.NewUserService(db)
-	userRoutes.NewUserRouter(app, &UserService)
+	routes.NewUserRouter(app, &UserService)
+	SetupRoutes(app, db)
 	err = app.Listen(PORT)
 	if err != nil {
 		log.Fatal(err)

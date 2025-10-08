@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 
-	"github.com/K44Z/boardly/schemas"
 	"github.com/K44Z/boardly/services/user/repository"
+	"github.com/K44Z/boardly/shared/schemas"
 )
 
 type UserService interface {

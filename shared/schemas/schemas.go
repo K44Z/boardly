@@ -2,6 +2,7 @@ package schemas
 
 import (
 	sqlc "github.com/K44Z/boardly/database/generated"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -10,6 +11,12 @@ type User struct {
 	Email    string `json:"email"`
 	Password string `json:"-"`
 	Username string `json:"username"`
+}
+type Board struct {
+	ID        int32
+	Name      string
+	OwnerID   pgtype.Int4
+	CreatedAt pgtype.Timestamp
 }
 
 type DB struct {

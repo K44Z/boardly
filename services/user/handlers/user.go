@@ -5,9 +5,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/K44Z/boardly/schemas"
 	"github.com/K44Z/boardly/services/user/services"
-	"github.com/K44Z/boardly/services/user/utils"
+	"github.com/K44Z/boardly/shared/schemas"
+	"github.com/K44Z/boardly/shared/utils"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -76,6 +76,11 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 	}
 	user, err := h.service.CheckUser(c.Context(), req.Email)
 	if err != nil && !errors.Is(err, utils.UserNotFound) || user != nil {
+		if user != nil {
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "User already exists",
+			})
+		}
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
