@@ -1,83 +1,99 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Star, Clock, Users } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
 import { useAuth } from "@/contexts/auth-context";
-
-const mockBoards = [
-  {
-    id: "1",
-    name: "Product Roadmap",
-    description: "Q1 2025 planning and features",
-    color: "bg-primary",
-    starred: true,
-    lastViewed: "2 hours ago",
-    members: 5,
-  },
-  {
-    id: "2",
-    name: "Marketing Campaign",
-    description: "Launch strategy and content calendar",
-    color: "bg-muted",
-    starred: false,
-    lastViewed: "1 day ago",
-    members: 3,
-  },
-  {
-    id: "3",
-    name: "Design System",
-    description: "Component library and guidelines",
-    color: "bg-accent",
-    starred: true,
-    lastViewed: "3 hours ago",
-    members: 4,
-  },
-  {
-    id: "4",
-    name: "Customer Feedback",
-    description: "User research and feature requests",
-    color: "bg-secondary",
-    starred: false,
-    lastViewed: "5 days ago",
-    members: 2,
-  },
-  {
-    id: "5",
-    name: "Sprint Planning",
-    description: "Current sprint tasks and backlog",
-    color: "bg-primary",
-    starred: true,
-    lastViewed: "30 minutes ago",
-    members: 8,
-  },
-  {
-    id: "6",
-    name: "Bug Tracking",
-    description: "Issues and technical debt",
-    color: "bg-muted",
-    starred: false,
-    lastViewed: "2 days ago",
-    members: 6,
-  },
-];
+import { api, type Board } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function BoardsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [boards, setBoards] = useState<Board[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [newBoardName, setNewBoardName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
   const { logout } = useAuth();
+  const { toast } = useToast();
 
-  const filteredBoards = mockBoards.filter(
-    (board) =>
-      board.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      board.description.toLowerCase().includes(searchQuery.toLowerCase()),
+  useEffect(() => {
+    fetchBoards();
+  }, []);
+
+  const fetchBoards = async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.getBoards();
+      
+      if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (response.data?.boards) {
+        setBoards(response.data.boards);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch boards",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateBoard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBoardName.trim()) return;
+
+    setIsCreating(true);
+    try {
+      const response = await api.createBoard({ name: newBoardName });
+
+      if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: "Board created successfully!",
+      });
+
+      setShowCreateModal(false);
+      setNewBoardName("");
+      fetchBoards(); 
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create board",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const filteredBoards = boards.filter((board) =>
+    board.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const starredBoards = filteredBoards.filter((board) => board.starred);
-  const recentBoards = filteredBoards.filter((board) => !board.starred);
+  const starredBoards = filteredBoards.filter((board) => false); // TODO: Add starring feature
+  const recentBoards = filteredBoards;
 
   return (
     <ProtectedRoute>
@@ -145,56 +161,16 @@ export default function BoardsPage() {
           </div>
         </div>
 
-        {/* Starred Boards */}
-        {starredBoards.length > 0 && (
-          <div className="mb-12 animate-slide-up">
-            <div className="flex items-center gap-2 mb-4">
-              <Star className="w-5 h-5 fill-current" />
-              <h2 className="text-xl font-bold">Starred Boards</h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {starredBoards.map((board, index) => (
-                <Link
-                  key={board.id}
-                  href={`/board/${board.id}`}
-                  className="group animate-fade-in"
-                  style={{ animationDelay: `${index * 0.05}s` }}
-                >
-                  <div className="border border-border rounded-lg p-6 bg-card/50 hover:bg-card hover:border-primary/50 transition-all duration-300 cursor-pointer h-full group-hover:scale-[1.02] group-hover:shadow-lg">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className={`w-12 h-12 ${board.color} rounded-lg`} />
-                      <Star className="w-5 h-5 fill-current text-foreground" />
-                    </div>
-                    <h3 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors">
-                      {board.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                      {board.description}
-                    </p>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {board.lastViewed}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Users className="w-3 h-3" />
-                        {board.members}
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-16">
+            <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
           </div>
         )}
 
         {/* Recent Boards */}
-        {recentBoards.length > 0 && (
+        {!isLoading && recentBoards.length > 0 && (
           <div className="animate-slide-up" style={{ animationDelay: "0.1s" }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Clock className="w-5 h-5" />
-              <h2 className="text-xl font-bold">Recent Boards</h2>
-            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {recentBoards.map((board, index) => (
                 <Link
@@ -202,40 +178,41 @@ export default function BoardsPage() {
                   href={`/board/${board.id}`}
                   className="group animate-fade-in"
                   style={{
-                    animationDelay: `${(index + starredBoards.length) * 0.05}s`,
+                    animationDelay: `${index * 0.05}s`,
                   }}
                 >
                   <div className="border border-border rounded-lg p-6 bg-card/50 hover:bg-card hover:border-primary/50 transition-all duration-300 cursor-pointer h-full group-hover:scale-[1.02] group-hover:shadow-lg">
                     <div className="flex items-start justify-between mb-4">
-                      <div className={`w-12 h-12 ${board.color} rounded-lg`} />
+                      <div className="w-12 h-12 bg-primary rounded-lg" />
                       <Star className="w-5 h-5 text-muted-foreground hover:text-foreground hover:fill-current transition-colors" />
                     </div>
                     <h3 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors">
                       {board.name}
                     </h3>
-                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                      {board.description}
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {board.owner_username && `By ${board.owner_username}`}
                     </p>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        {board.lastViewed}
+                        {new Date(board.created_at).toLocaleDateString()}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Users className="w-3 h-3" />
-                        {board.members}
-                      </div>
+                      {board.member_count !== undefined && (
+                        <div className="flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          {board.member_count}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </Link>
               ))}
 
-              {/* Create new board card */}
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="border border-dashed border-border rounded-lg p-6 bg-card/30 hover:bg-card/50 hover:border-primary/50 transition-all duration-300 cursor-pointer h-full flex flex-col items-center justify-center gap-3 group animate-fade-in"
                 style={{
-                  animationDelay: `${(recentBoards.length + starredBoards.length) * 0.05}s`,
+                  animationDelay: `${recentBoards.length * 0.05}s`,
                 }}
               >
                 <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
@@ -248,14 +225,14 @@ export default function BoardsPage() {
         )}
 
         {/* Empty state */}
-        {filteredBoards.length === 0 && (
+        {!isLoading && filteredBoards.length === 0 && (
           <div className="text-center py-16 animate-fade-in">
             <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
               <Search className="w-8 h-8 text-muted-foreground" />
             </div>
             <h3 className="text-xl font-bold mb-2">No boards found</h3>
             <p className="text-muted-foreground mb-6">
-              Try adjusting your search or create a new board
+              {searchQuery ? "Try adjusting your search or create a new board" : "Create your first board to get started"}
             </p>
             <Button
               onClick={() => setShowCreateModal(true)}
@@ -279,42 +256,40 @@ export default function BoardsPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-2xl font-bold mb-6">Create new board</h2>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setShowCreateModal(false);
-              }}
-              className="space-y-4"
-            >
+            <form onSubmit={handleCreateBoard} className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">
                   Board name
                 </label>
                 <Input
                   placeholder="e.g., Product Roadmap"
+                  value={newBoardName}
+                  onChange={(e) => setNewBoardName(e.target.value)}
+                  required
                   className="bg-background border-border"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">
-                  Description (optional)
-                </label>
-                <Input
-                  placeholder="What's this board about?"
-                  className="bg-background border-border"
+                  disabled={isCreating}
                 />
               </div>
               <div className="flex items-center gap-3 pt-4">
                 <Button
                   type="submit"
                   className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+                  disabled={isCreating}
                 >
-                  Create Board
+                  {isCreating ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                      Creating...
+                    </div>
+                  ) : (
+                    "Create Board"
+                  )}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowCreateModal(false)}
+                  disabled={isCreating}
                 >
                   Cancel
                 </Button>

@@ -23,6 +23,23 @@ export interface User {
   email: string;
 }
 
+export interface Board {
+  id: number;
+  name: string;
+  owner_id: number;
+  created_at: string;
+  owner_username?: string;
+  member_count?: number;
+}
+
+export interface CreateBoardRequest {
+  name: string;
+}
+
+export interface UpdateBoardRequest {
+  name: string;
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -91,6 +108,39 @@ class ApiClient {
     return this.request<{ users: User[] }>('/api/user/search', {
       method: 'POST',
       body: JSON.stringify({ query }),
+    });
+  }
+
+  // Board endpoints
+  async getBoards(): Promise<ApiResponse<{ boards: Board[] }>> {
+    return this.request<{ boards: Board[] }>('/api/board/', {
+      method: 'GET',
+    });
+  }
+
+  async getBoardById(id: number): Promise<ApiResponse<{ board: Board }>> {
+    return this.request<{ board: Board }>(`/api/board/${id}`, {
+      method: 'GET',
+    });
+  }
+
+  async createBoard(data: CreateBoardRequest): Promise<ApiResponse<{ board: Board }>> {
+    return this.request<{ board: Board }>('/api/board', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateBoard(id: number, data: UpdateBoardRequest): Promise<ApiResponse<{ board: Board }>> {
+    return this.request<{ board: Board }>(`/api/board/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBoard(id: number): Promise<ApiResponse> {
+    return this.request(`/api/board/${id}`, {
+      method: 'DELETE',
     });
   }
 }

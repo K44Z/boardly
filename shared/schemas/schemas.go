@@ -1,6 +1,8 @@
 package schemas
 
 import (
+	"time"
+
 	sqlc "github.com/K44Z/boardly/database/generated"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,6 +20,15 @@ type Board struct {
 	Name      string
 	OwnerID   pgtype.Int4
 	CreatedAt pgtype.Timestamp
+}
+
+type BoardWithOwner struct {
+	ID            int32     `json:"id"`
+	Name          string    `json:"name"`
+	OwnerID       int32     `json:"owner_id"`
+	CreatedAt     time.Time `json:"created_at"`
+	OwnerUsername string    `json:"owner_username"`
+	MemberCount   int64     `json:"member_count,omitempty"`
 }
 
 type List struct {
