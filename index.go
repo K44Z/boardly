@@ -1,12 +1,12 @@
 package main
 
 import (
-	br "github.com/K44Z/boardly/services/board/routes"
+	br "github.com/K44Z/boardly/internal/board/routes"
 
-	bs "github.com/K44Z/boardly/services/board/services"
-	ur "github.com/K44Z/boardly/services/user/routes"
+	bs "github.com/K44Z/boardly/internal/board/services"
+	ur "github.com/K44Z/boardly/internal/user/routes"
 
-	us "github.com/K44Z/boardly/services/user/services"
+	us "github.com/K44Z/boardly/internal/user/services"
 	"github.com/K44Z/boardly/shared/schemas"
 	"github.com/gofiber/fiber/v2"
 )

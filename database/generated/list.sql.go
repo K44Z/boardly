@@ -11,6 +11,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countListsByBoard = `-- name: CountListsByBoard :one
+SELECT COUNT(*) FROM lists WHERE board_id = $1
+`
+
+func (q *Queries) CountListsByBoard(ctx context.Context, boardID pgtype.Int4) (int64, error) {
+	row := q.db.QueryRow(ctx, countListsByBoard, boardID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createList = `-- name: CreateList :one
 INSERT INTO lists (board_id, name, position)
 VALUES ($1, $2, $3)
@@ -45,6 +56,65 @@ func (q *Queries) DeleteList(ctx context.Context, id int32) error {
 	return err
 }
 
+const getListBoard = `-- name: GetListBoard :one
+SELECT board_id FROM lists WHERE id = $1
+`
+
+func (q *Queries) GetListBoard(ctx context.Context, id int32) (pgtype.Int4, error) {
+	row := q.db.QueryRow(ctx, getListBoard, id)
+	var board_id pgtype.Int4
+	err := row.Scan(&board_id)
+	return board_id, err
+}
+
+const getListByID = `-- name: GetListByID :one
+SELECT id, board_id, name, position, created_at FROM lists WHERE id = $1
+`
+
+func (q *Queries) GetListByID(ctx context.Context, id int32) (List, error) {
+	row := q.db.QueryRow(ctx, getListByID, id)
+	var i List
+	err := row.Scan(
+		&i.ID,
+		&i.BoardID,
+		&i.Name,
+		&i.Position,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getListWithCardCount = `-- name: GetListWithCardCount :one
+SELECT l.id, l.board_id, l.name, l.position, l.created_at, COUNT(c.id) as card_count
+FROM lists l
+LEFT JOIN cards c ON l.id = c.list_id
+WHERE l.id = $1
+GROUP BY l.id
+`
+
+type GetListWithCardCountRow struct {
+	ID        int32
+	BoardID   pgtype.Int4
+	Name      string
+	Position  int32
+	CreatedAt pgtype.Timestamp
+	CardCount int64
+}
+
+func (q *Queries) GetListWithCardCount(ctx context.Context, id int32) (GetListWithCardCountRow, error) {
+	row := q.db.QueryRow(ctx, getListWithCardCount, id)
+	var i GetListWithCardCountRow
+	err := row.Scan(
+		&i.ID,
+		&i.BoardID,
+		&i.Name,
+		&i.Position,
+		&i.CreatedAt,
+		&i.CardCount,
+	)
+	return i, err
+}
+
 const getListsByBoard = `-- name: GetListsByBoard :many
 SELECT id, board_id, name, position, created_at FROM lists WHERE board_id = $1 ORDER BY position
 `
@@ -75,6 +145,79 @@ func (q *Queries) GetListsByBoard(ctx context.Context, boardID pgtype.Int4) ([]L
 	return items, nil
 }
 
+const getListsWithCardCount = `-- name: GetListsWithCardCount :many
+SELECT l.id, l.board_id, l.name, l.position, l.created_at, COUNT(c.id) as card_count
+FROM lists l
+LEFT JOIN cards c ON l.id = c.list_id
+WHERE l.board_id = $1
+GROUP BY l.id
+ORDER BY l.position
+`
+
+type GetListsWithCardCountRow struct {
+	ID        int32
+	BoardID   pgtype.Int4
+	Name      string
+	Position  int32
+	CreatedAt pgtype.Timestamp
+	CardCount int64
+}
+
+func (q *Queries) GetListsWithCardCount(ctx context.Context, boardID pgtype.Int4) ([]GetListsWithCardCountRow, error) {
+	rows, err := q.db.Query(ctx, getListsWithCardCount, boardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetListsWithCardCountRow
+	for rows.Next() {
+		var i GetListsWithCardCountRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.BoardID,
+			&i.Name,
+			&i.Position,
+			&i.CreatedAt,
+			&i.CardCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getMaxListPosition = `-- name: GetMaxListPosition :one
+SELECT COALESCE(MAX(position), -1) as max_position
+FROM lists WHERE board_id = $1
+`
+
+func (q *Queries) GetMaxListPosition(ctx context.Context, boardID pgtype.Int4) (interface{}, error) {
+	row := q.db.QueryRow(ctx, getMaxListPosition, boardID)
+	var max_position interface{}
+	err := row.Scan(&max_position)
+	return max_position, err
+}
+
+const reorderListsAfterDelete = `-- name: ReorderListsAfterDelete :exec
+UPDATE lists
+SET position = position - 1
+WHERE board_id = $1 AND position > $2
+`
+
+type ReorderListsAfterDeleteParams struct {
+	BoardID  pgtype.Int4
+	Position int32
+}
+
+func (q *Queries) ReorderListsAfterDelete(ctx context.Context, arg ReorderListsAfterDeleteParams) error {
+	_, err := q.db.Exec(ctx, reorderListsAfterDelete, arg.BoardID, arg.Position)
+	return err
+}
+
 const updateListPosition = `-- name: UpdateListPosition :exec
 UPDATE lists
 SET position = $2
@@ -88,6 +231,27 @@ type UpdateListPositionParams struct {
 
 func (q *Queries) UpdateListPosition(ctx context.Context, arg UpdateListPositionParams) error {
 	_, err := q.db.Exec(ctx, updateListPosition, arg.ID, arg.Position)
+	return err
+}
+
+const updateListPositions = `-- name: UpdateListPositions :exec
+UPDATE lists
+SET position = 
+    CASE
+        WHEN id = ANY($1::int[]) THEN 
+            (array_position($1::int[], id) - 1)
+        ELSE position
+    END
+WHERE board_id = $2
+`
+
+type UpdateListPositionsParams struct {
+	Column1 []int32
+	BoardID pgtype.Int4
+}
+
+func (q *Queries) UpdateListPositions(ctx context.Context, arg UpdateListPositionsParams) error {
+	_, err := q.db.Exec(ctx, updateListPositions, arg.Column1, arg.BoardID)
 	return err
 }
 

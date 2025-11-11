@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/K44Z/boardly/services/user/handlers"
-	"github.com/K44Z/boardly/services/user/services"
+	"github.com/K44Z/boardly/internal/user/handlers"
+	"github.com/K44Z/boardly/internal/user/services"
 	"github.com/stretchr/testify/assert"
 )
 

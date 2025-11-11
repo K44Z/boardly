@@ -11,6 +11,66 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const checkBoardAccess = `-- name: CheckBoardAccess :one
+SELECT EXISTS(
+    SELECT 1 FROM boards b
+    LEFT JOIN memberships m ON b.id = m.board_id
+    WHERE b.id = $1 AND (b.owner_id = $2 OR m.user_id = $2)
+) as has_access
+`
+
+type CheckBoardAccessParams struct {
+	ID      int32
+	OwnerID pgtype.Int4
+}
+
+func (q *Queries) CheckBoardAccess(ctx context.Context, arg CheckBoardAccessParams) (bool, error) {
+	row := q.db.QueryRow(ctx, checkBoardAccess, arg.ID, arg.OwnerID)
+	var has_access bool
+	err := row.Scan(&has_access)
+	return has_access, err
+}
+
+const checkBoardOwnership = `-- name: CheckBoardOwnership :one
+SELECT EXISTS(
+    SELECT 1 FROM boards WHERE id = $1 AND owner_id = $2
+) as is_owner
+`
+
+type CheckBoardOwnershipParams struct {
+	ID      int32
+	OwnerID pgtype.Int4
+}
+
+func (q *Queries) CheckBoardOwnership(ctx context.Context, arg CheckBoardOwnershipParams) (bool, error) {
+	row := q.db.QueryRow(ctx, checkBoardOwnership, arg.ID, arg.OwnerID)
+	var is_owner bool
+	err := row.Scan(&is_owner)
+	return is_owner, err
+}
+
+const countBoardMembers = `-- name: CountBoardMembers :one
+SELECT COUNT(*) FROM memberships WHERE board_id = $1
+`
+
+func (q *Queries) CountBoardMembers(ctx context.Context, boardID pgtype.Int4) (int64, error) {
+	row := q.db.QueryRow(ctx, countBoardMembers, boardID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countBoardsByOwner = `-- name: CountBoardsByOwner :one
+SELECT COUNT(*) FROM boards WHERE owner_id = $1
+`
+
+func (q *Queries) CountBoardsByOwner(ctx context.Context, ownerID pgtype.Int4) (int64, error) {
+	row := q.db.QueryRow(ctx, countBoardsByOwner, ownerID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createBoard = `-- name: CreateBoard :one
 INSERT INTO boards (name, owner_id)
 VALUES ($1, $2)
@@ -34,6 +94,64 @@ func (q *Queries) CreateBoard(ctx context.Context, arg CreateBoardParams) (Board
 	return i, err
 }
 
+const createMembership = `-- name: CreateMembership :one
+INSERT INTO memberships (board_id, user_id, role)
+VALUES ($1, $2, $3)
+RETURNING id, board_id, user_id, role, created_at
+`
+
+type CreateMembershipParams struct {
+	BoardID pgtype.Int4
+	UserID  pgtype.Int4
+	Role    string
+}
+
+// Memberships
+func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipParams) (Membership, error) {
+	row := q.db.QueryRow(ctx, createMembership, arg.BoardID, arg.UserID, arg.Role)
+	var i Membership
+	err := row.Scan(
+		&i.ID,
+		&i.BoardID,
+		&i.UserID,
+		&i.Role,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deleteBoard = `-- name: DeleteBoard :exec
+DELETE FROM boards WHERE id = $1
+`
+
+func (q *Queries) DeleteBoard(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, deleteBoard, id)
+	return err
+}
+
+const deleteBoardMemberships = `-- name: DeleteBoardMemberships :exec
+DELETE FROM memberships WHERE board_id = $1
+`
+
+func (q *Queries) DeleteBoardMemberships(ctx context.Context, boardID pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, deleteBoardMemberships, boardID)
+	return err
+}
+
+const deleteMembership = `-- name: DeleteMembership :exec
+DELETE FROM memberships WHERE board_id = $1 AND user_id = $2
+`
+
+type DeleteMembershipParams struct {
+	BoardID pgtype.Int4
+	UserID  pgtype.Int4
+}
+
+func (q *Queries) DeleteMembership(ctx context.Context, arg DeleteMembershipParams) error {
+	_, err := q.db.Exec(ctx, deleteMembership, arg.BoardID, arg.UserID)
+	return err
+}
+
 const getBoardByID = `-- name: GetBoardByID :one
 SELECT id, name, owner_id, created_at FROM boards WHERE id = $1
 `
@@ -50,8 +168,151 @@ func (q *Queries) GetBoardByID(ctx context.Context, id int32) (Board, error) {
 	return i, err
 }
 
+const getBoardMembers = `-- name: GetBoardMembers :many
+SELECT m.id, m.board_id, m.user_id, m.role, m.created_at, u.username, u.email
+FROM memberships m
+JOIN users u ON m.user_id = u.id
+WHERE m.board_id = $1
+ORDER BY m.created_at ASC
+`
+
+type GetBoardMembersRow struct {
+	ID        int32
+	BoardID   pgtype.Int4
+	UserID    pgtype.Int4
+	Role      string
+	CreatedAt pgtype.Timestamp
+	Username  string
+	Email     string
+}
+
+func (q *Queries) GetBoardMembers(ctx context.Context, boardID pgtype.Int4) ([]GetBoardMembersRow, error) {
+	rows, err := q.db.Query(ctx, getBoardMembers, boardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetBoardMembersRow
+	for rows.Next() {
+		var i GetBoardMembersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.BoardID,
+			&i.UserID,
+			&i.Role,
+			&i.CreatedAt,
+			&i.Username,
+			&i.Email,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getBoardWithOwner = `-- name: GetBoardWithOwner :one
+SELECT b.id, b.name, b.owner_id, b.created_at, u.username as owner_username, u.email as owner_email
+FROM boards b
+JOIN users u ON b.owner_id = u.id
+WHERE b.id = $1
+`
+
+type GetBoardWithOwnerRow struct {
+	ID            int32
+	Name          string
+	OwnerID       pgtype.Int4
+	CreatedAt     pgtype.Timestamp
+	OwnerUsername string
+	OwnerEmail    string
+}
+
+func (q *Queries) GetBoardWithOwner(ctx context.Context, id int32) (GetBoardWithOwnerRow, error) {
+	row := q.db.QueryRow(ctx, getBoardWithOwner, id)
+	var i GetBoardWithOwnerRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.OwnerID,
+		&i.CreatedAt,
+		&i.OwnerUsername,
+		&i.OwnerEmail,
+	)
+	return i, err
+}
+
+const getMembership = `-- name: GetMembership :one
+SELECT id, board_id, user_id, role, created_at FROM memberships
+WHERE board_id = $1 AND user_id = $2
+`
+
+type GetMembershipParams struct {
+	BoardID pgtype.Int4
+	UserID  pgtype.Int4
+}
+
+func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (Membership, error) {
+	row := q.db.QueryRow(ctx, getMembership, arg.BoardID, arg.UserID)
+	var i Membership
+	err := row.Scan(
+		&i.ID,
+		&i.BoardID,
+		&i.UserID,
+		&i.Role,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getUserMemberships = `-- name: GetUserMemberships :many
+SELECT m.id, m.board_id, m.user_id, m.role, m.created_at, b.name as board_name
+FROM memberships m
+JOIN boards b ON m.board_id = b.id
+WHERE m.user_id = $1
+ORDER BY m.created_at DESC
+`
+
+type GetUserMembershipsRow struct {
+	ID        int32
+	BoardID   pgtype.Int4
+	UserID    pgtype.Int4
+	Role      string
+	CreatedAt pgtype.Timestamp
+	BoardName string
+}
+
+func (q *Queries) GetUserMemberships(ctx context.Context, userID pgtype.Int4) ([]GetUserMembershipsRow, error) {
+	rows, err := q.db.Query(ctx, getUserMemberships, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUserMembershipsRow
+	for rows.Next() {
+		var i GetUserMembershipsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.BoardID,
+			&i.UserID,
+			&i.Role,
+			&i.CreatedAt,
+			&i.BoardName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBoardsByOwner = `-- name: ListBoardsByOwner :many
-SELECT id, name, owner_id, created_at FROM boards WHERE owner_id = $1
+SELECT id, name, owner_id, created_at FROM boards WHERE owner_id = $1 ORDER BY created_at DESC
 `
 
 func (q *Queries) ListBoardsByOwner(ctx context.Context, ownerID pgtype.Int4) ([]Board, error) {
@@ -77,4 +338,139 @@ func (q *Queries) ListBoardsByOwner(ctx context.Context, ownerID pgtype.Int4) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const listBoardsByUser = `-- name: ListBoardsByUser :many
+SELECT DISTINCT b.id, b.name, b.owner_id, b.created_at, u.username as owner_username
+FROM boards b
+JOIN users u ON b.owner_id = u.id
+LEFT JOIN memberships m ON b.id = m.board_id
+WHERE b.owner_id = $1 OR m.user_id = $1
+ORDER BY b.created_at DESC
+`
+
+type ListBoardsByUserRow struct {
+	ID            int32
+	Name          string
+	OwnerID       pgtype.Int4
+	CreatedAt     pgtype.Timestamp
+	OwnerUsername string
+}
+
+func (q *Queries) ListBoardsByUser(ctx context.Context, ownerID pgtype.Int4) ([]ListBoardsByUserRow, error) {
+	rows, err := q.db.Query(ctx, listBoardsByUser, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListBoardsByUserRow
+	for rows.Next() {
+		var i ListBoardsByUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.OwnerID,
+			&i.CreatedAt,
+			&i.OwnerUsername,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchBoards = `-- name: SearchBoards :many
+SELECT b.id, b.name, b.owner_id, b.created_at, u.username as owner_username
+FROM boards b
+JOIN users u ON b.owner_id = u.id
+WHERE b.name ILIKE '%' || $1 || '%'
+ORDER BY b.created_at DESC
+`
+
+type SearchBoardsRow struct {
+	ID            int32
+	Name          string
+	OwnerID       pgtype.Int4
+	CreatedAt     pgtype.Timestamp
+	OwnerUsername string
+}
+
+func (q *Queries) SearchBoards(ctx context.Context, dollar_1 string) ([]SearchBoardsRow, error) {
+	rows, err := q.db.Query(ctx, searchBoards, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchBoardsRow
+	for rows.Next() {
+		var i SearchBoardsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.OwnerID,
+			&i.CreatedAt,
+			&i.OwnerUsername,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateBoard = `-- name: UpdateBoard :one
+UPDATE boards
+SET name = $2
+WHERE id = $1
+RETURNING id, name, owner_id, created_at
+`
+
+type UpdateBoardParams struct {
+	ID   int32
+	Name string
+}
+
+func (q *Queries) UpdateBoard(ctx context.Context, arg UpdateBoardParams) (Board, error) {
+	row := q.db.QueryRow(ctx, updateBoard, arg.ID, arg.Name)
+	var i Board
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.OwnerID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateMembershipRole = `-- name: UpdateMembershipRole :one
+UPDATE memberships
+SET role = $3
+WHERE board_id = $1 AND user_id = $2
+RETURNING id, board_id, user_id, role, created_at
+`
+
+type UpdateMembershipRoleParams struct {
+	BoardID pgtype.Int4
+	UserID  pgtype.Int4
+	Role    string
+}
+
+func (q *Queries) UpdateMembershipRole(ctx context.Context, arg UpdateMembershipRoleParams) (Membership, error) {
+	row := q.db.QueryRow(ctx, updateMembershipRole, arg.BoardID, arg.UserID, arg.Role)
+	var i Membership
+	err := row.Scan(
+		&i.ID,
+		&i.BoardID,
+		&i.UserID,
+		&i.Role,
+		&i.CreatedAt,
+	)
+	return i, err
 }

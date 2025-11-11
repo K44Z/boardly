@@ -9,8 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/K44Z/boardly/services/board/handlers"
-	"github.com/K44Z/boardly/services/board/services"
+	"github.com/K44Z/boardly/internal/board/handlers"
+	"github.com/K44Z/boardly/internal/board/services"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,10 +20,9 @@ func TestCreateBoardHandler(t *testing.T) {
 	h := handlers.NewBoardHandler(&s)
 	app.Post("/create", h.CreateBoardHandler)
 	payload := &handlers.CreateBoardRequest{
-		Name:    "gocampus",
+		Name:    "damn",
 		OwnerId: "1",
 	}
-
 	jsonBody, err := json.Marshal(payload)
 	if err != nil {
 		t.Fatal("error marshaling payload ", err)

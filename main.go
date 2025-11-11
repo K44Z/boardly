@@ -5,10 +5,11 @@ import (
 	"os"
 
 	"github.com/K44Z/boardly/database"
-	"github.com/K44Z/boardly/services/user/routes"
-	"github.com/K44Z/boardly/services/user/services"
+	"github.com/K44Z/boardly/internal/user/routes"
+	"github.com/K44Z/boardly/internal/user/services"
 	"github.com/K44Z/boardly/shared/schemas"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 
 	"github.com/joho/godotenv"
@@ -16,6 +17,15 @@ import (
 
 func main() {
 	app := fiber.New()
+
+	// Add CORS middleware
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "http://localhost:3000",
+		AllowCredentials: true,
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
+	}))
+
 	app.Use(logger.New())
 	err := godotenv.Load()
 	if err != nil {
@@ -36,7 +46,7 @@ func main() {
 	UserService := services.NewUserService(db)
 	routes.NewUserRouter(app, &UserService)
 	SetupRoutes(app, db)
-	err = app.Listen(PORT)
+	err = app.Listen(":" + PORT)
 	if err != nil {
 		log.Fatal(err)
 	}

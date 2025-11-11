@@ -7,7 +7,46 @@ package sqlc
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const countUsers = `-- name: CountUsers :one
+SELECT COUNT(*) FROM users
+`
+
+func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countUsers)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createSession = `-- name: CreateSession :one
+INSERT INTO sessions (user_id, token, expires_at)
+VALUES ($1, $2, $3)
+RETURNING id, user_id, token, created_at, expires_at
+`
+
+type CreateSessionParams struct {
+	UserID    pgtype.Int4
+	Token     string
+	ExpiresAt pgtype.Timestamp
+}
+
+// Sessions
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
+	row := q.db.QueryRow(ctx, createSession, arg.UserID, arg.Token, arg.ExpiresAt)
+	var i Session
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Token,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+	)
+	return i, err
+}
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, email, password)
@@ -34,6 +73,24 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const deleteExpiredSessions = `-- name: DeleteExpiredSessions :exec
+DELETE FROM sessions WHERE expires_at <= NOW()
+`
+
+func (q *Queries) DeleteExpiredSessions(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteExpiredSessions)
+	return err
+}
+
+const deleteSession = `-- name: DeleteSession :exec
+DELETE FROM sessions WHERE token = $1
+`
+
+func (q *Queries) DeleteSession(ctx context.Context, token string) error {
+	_, err := q.db.Exec(ctx, deleteSession, token)
+	return err
+}
+
 const deleteUser = `-- name: DeleteUser :exec
 DELETE FROM users WHERE id = $1
 `
@@ -41,6 +98,49 @@ DELETE FROM users WHERE id = $1
 func (q *Queries) DeleteUser(ctx context.Context, id int32) error {
 	_, err := q.db.Exec(ctx, deleteUser, id)
 	return err
+}
+
+const deleteUserSessions = `-- name: DeleteUserSessions :exec
+DELETE FROM sessions WHERE user_id = $1
+`
+
+func (q *Queries) DeleteUserSessions(ctx context.Context, userID pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, deleteUserSessions, userID)
+	return err
+}
+
+const getSessionByToken = `-- name: GetSessionByToken :one
+SELECT s.id, s.user_id, s.token, s.created_at, s.expires_at, u.id as user_id, u.username, u.email
+FROM sessions s
+JOIN users u ON s.user_id = u.id
+WHERE s.token = $1 AND s.expires_at > NOW()
+`
+
+type GetSessionByTokenRow struct {
+	ID        int32
+	UserID    pgtype.Int4
+	Token     string
+	CreatedAt pgtype.Timestamp
+	ExpiresAt pgtype.Timestamp
+	UserID_2  int32
+	Username  string
+	Email     string
+}
+
+func (q *Queries) GetSessionByToken(ctx context.Context, token string) (GetSessionByTokenRow, error) {
+	row := q.db.QueryRow(ctx, getSessionByToken, token)
+	var i GetSessionByTokenRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Token,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.UserID_2,
+		&i.Username,
+		&i.Email,
+	)
+	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
@@ -77,6 +177,55 @@ func (q *Queries) GetUserByID(ctx context.Context, id int32) (User, error) {
 	return i, err
 }
 
+const getUserByUsername = `-- name: GetUserByUsername :one
+SELECT id, email, password, username, created_at FROM users WHERE username = $1
+`
+
+func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByUsername, username)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Password,
+		&i.Username,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getUserSessions = `-- name: GetUserSessions :many
+SELECT id, user_id, token, created_at, expires_at FROM sessions 
+WHERE user_id = $1 AND expires_at > NOW()
+ORDER BY created_at DESC
+`
+
+func (q *Queries) GetUserSessions(ctx context.Context, userID pgtype.Int4) ([]Session, error) {
+	rows, err := q.db.Query(ctx, getUserSessions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Session
+	for rows.Next() {
+		var i Session
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Token,
+			&i.CreatedAt,
+			&i.ExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUsers = `-- name: ListUsers :many
 SELECT id, email, password, username, created_at FROM users ORDER BY created_at DESC
 `
@@ -107,9 +256,101 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 	return items, nil
 }
 
+const listUsersPaginated = `-- name: ListUsersPaginated :many
+SELECT id, email, password, username, created_at FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2
+`
+
+type ListUsersPaginatedParams struct {
+	Limit  int32
+	Offset int32
+}
+
+func (q *Queries) ListUsersPaginated(ctx context.Context, arg ListUsersPaginatedParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, listUsersPaginated, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Password,
+			&i.Username,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchUsers = `-- name: SearchUsers :many
+SELECT id, email, password, username, created_at FROM users 
+WHERE username ILIKE '%' || $1 || '%' OR email ILIKE '%' || $1 || '%'
+ORDER BY created_at DESC
+`
+
+func (q *Queries) SearchUsers(ctx context.Context, dollar_1 string) ([]User, error) {
+	rows, err := q.db.Query(ctx, searchUsers, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Password,
+			&i.Username,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateSessionExpiry = `-- name: UpdateSessionExpiry :one
+UPDATE sessions
+SET expires_at = $2
+WHERE token = $1
+RETURNING id, user_id, token, created_at, expires_at
+`
+
+type UpdateSessionExpiryParams struct {
+	Token     string
+	ExpiresAt pgtype.Timestamp
+}
+
+func (q *Queries) UpdateSessionExpiry(ctx context.Context, arg UpdateSessionExpiryParams) (Session, error) {
+	row := q.db.QueryRow(ctx, updateSessionExpiry, arg.Token, arg.ExpiresAt)
+	var i Session
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Token,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+	)
+	return i, err
+}
+
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
-SET username = $2, password = $3
+SET username = $2, email = $3
 WHERE id = $1
 RETURNING id, email, password, username, created_at
 `
@@ -117,11 +358,86 @@ RETURNING id, email, password, username, created_at
 type UpdateUserParams struct {
 	ID       int32
 	Username string
-	Password string
+	Email    string
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUser, arg.ID, arg.Username, arg.Password)
+	row := q.db.QueryRow(ctx, updateUser, arg.ID, arg.Username, arg.Email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Password,
+		&i.Username,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateUserEmail = `-- name: UpdateUserEmail :one
+UPDATE users
+SET email = $2
+WHERE id = $1
+RETURNING id, email, password, username, created_at
+`
+
+type UpdateUserEmailParams struct {
+	ID    int32
+	Email string
+}
+
+func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserEmail, arg.ID, arg.Email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Password,
+		&i.Username,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :one
+UPDATE users
+SET password = $2
+WHERE id = $1
+RETURNING id, email, password, username, created_at
+`
+
+type UpdateUserPasswordParams struct {
+	ID       int32
+	Password string
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserPassword, arg.ID, arg.Password)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Password,
+		&i.Username,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateUserUsername = `-- name: UpdateUserUsername :one
+UPDATE users
+SET username = $2
+WHERE id = $1
+RETURNING id, email, password, username, created_at
+`
+
+type UpdateUserUsernameParams struct {
+	ID       int32
+	Username string
+}
+
+func (q *Queries) UpdateUserUsername(ctx context.Context, arg UpdateUserUsernameParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserUsername, arg.ID, arg.Username)
 	var i User
 	err := row.Scan(
 		&i.ID,

@@ -11,6 +11,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countCardsByList = `-- name: CountCardsByList :one
+SELECT COUNT(*) FROM cards WHERE list_id = $1
+`
+
+func (q *Queries) CountCardsByList(ctx context.Context, listID pgtype.Int4) (int64, error) {
+	row := q.db.QueryRow(ctx, countCardsByList, listID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createCard = `-- name: CreateCard :one
 INSERT INTO cards (list_id, title, description, position, due_date)
 VALUES ($1, $2, $3, $4, $5)
@@ -74,6 +85,101 @@ func (q *Queries) GetCardByID(ctx context.Context, id int32) (Card, error) {
 	return i, err
 }
 
+const getCardList = `-- name: GetCardList :one
+SELECT list_id FROM cards WHERE id = $1
+`
+
+func (q *Queries) GetCardList(ctx context.Context, id int32) (pgtype.Int4, error) {
+	row := q.db.QueryRow(ctx, getCardList, id)
+	var list_id pgtype.Int4
+	err := row.Scan(&list_id)
+	return list_id, err
+}
+
+const getCardWithDetails = `-- name: GetCardWithDetails :one
+SELECT c.id, c.list_id, c.title, c.description, c.position, c.due_date, c.created_at, l.name as list_name, l.board_id
+FROM cards c
+JOIN lists l ON c.list_id = l.id
+WHERE c.id = $1
+`
+
+type GetCardWithDetailsRow struct {
+	ID          int32
+	ListID      pgtype.Int4
+	Title       string
+	Description string
+	Position    int32
+	DueDate     pgtype.Timestamp
+	CreatedAt   pgtype.Timestamp
+	ListName    string
+	BoardID     pgtype.Int4
+}
+
+func (q *Queries) GetCardWithDetails(ctx context.Context, id int32) (GetCardWithDetailsRow, error) {
+	row := q.db.QueryRow(ctx, getCardWithDetails, id)
+	var i GetCardWithDetailsRow
+	err := row.Scan(
+		&i.ID,
+		&i.ListID,
+		&i.Title,
+		&i.Description,
+		&i.Position,
+		&i.DueDate,
+		&i.CreatedAt,
+		&i.ListName,
+		&i.BoardID,
+	)
+	return i, err
+}
+
+const getCardsByBoard = `-- name: GetCardsByBoard :many
+SELECT c.id, c.list_id, c.title, c.description, c.position, c.due_date, c.created_at, l.name as list_name
+FROM cards c
+JOIN lists l ON c.list_id = l.id
+WHERE l.board_id = $1
+ORDER BY l.position, c.position
+`
+
+type GetCardsByBoardRow struct {
+	ID          int32
+	ListID      pgtype.Int4
+	Title       string
+	Description string
+	Position    int32
+	DueDate     pgtype.Timestamp
+	CreatedAt   pgtype.Timestamp
+	ListName    string
+}
+
+func (q *Queries) GetCardsByBoard(ctx context.Context, boardID pgtype.Int4) ([]GetCardsByBoardRow, error) {
+	rows, err := q.db.Query(ctx, getCardsByBoard, boardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetCardsByBoardRow
+	for rows.Next() {
+		var i GetCardsByBoardRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ListID,
+			&i.Title,
+			&i.Description,
+			&i.Position,
+			&i.DueDate,
+			&i.CreatedAt,
+			&i.ListName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCardsByList = `-- name: GetCardsByList :many
 SELECT id, list_id, title, description, position, due_date, created_at FROM cards WHERE list_id = $1 ORDER BY position
 `
@@ -106,6 +212,120 @@ func (q *Queries) GetCardsByList(ctx context.Context, listID pgtype.Int4) ([]Car
 	return items, nil
 }
 
+const getCardsDueSoon = `-- name: GetCardsDueSoon :many
+SELECT c.id, c.list_id, c.title, c.description, c.position, c.due_date, c.created_at, l.name as list_name, l.board_id
+FROM cards c
+JOIN lists l ON c.list_id = l.id
+WHERE c.due_date IS NOT NULL 
+AND c.due_date > NOW() 
+AND c.due_date <= NOW() + INTERVAL '7 days'
+ORDER BY c.due_date ASC
+`
+
+type GetCardsDueSoonRow struct {
+	ID          int32
+	ListID      pgtype.Int4
+	Title       string
+	Description string
+	Position    int32
+	DueDate     pgtype.Timestamp
+	CreatedAt   pgtype.Timestamp
+	ListName    string
+	BoardID     pgtype.Int4
+}
+
+func (q *Queries) GetCardsDueSoon(ctx context.Context) ([]GetCardsDueSoonRow, error) {
+	rows, err := q.db.Query(ctx, getCardsDueSoon)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetCardsDueSoonRow
+	for rows.Next() {
+		var i GetCardsDueSoonRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ListID,
+			&i.Title,
+			&i.Description,
+			&i.Position,
+			&i.DueDate,
+			&i.CreatedAt,
+			&i.ListName,
+			&i.BoardID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getMaxCardPosition = `-- name: GetMaxCardPosition :one
+SELECT COALESCE(MAX(position), -1) as max_position
+FROM cards WHERE list_id = $1
+`
+
+func (q *Queries) GetMaxCardPosition(ctx context.Context, listID pgtype.Int4) (interface{}, error) {
+	row := q.db.QueryRow(ctx, getMaxCardPosition, listID)
+	var max_position interface{}
+	err := row.Scan(&max_position)
+	return max_position, err
+}
+
+const getOverdueCards = `-- name: GetOverdueCards :many
+SELECT c.id, c.list_id, c.title, c.description, c.position, c.due_date, c.created_at, l.name as list_name, l.board_id
+FROM cards c
+JOIN lists l ON c.list_id = l.id
+WHERE c.due_date IS NOT NULL AND c.due_date < NOW()
+ORDER BY c.due_date ASC
+`
+
+type GetOverdueCardsRow struct {
+	ID          int32
+	ListID      pgtype.Int4
+	Title       string
+	Description string
+	Position    int32
+	DueDate     pgtype.Timestamp
+	CreatedAt   pgtype.Timestamp
+	ListName    string
+	BoardID     pgtype.Int4
+}
+
+func (q *Queries) GetOverdueCards(ctx context.Context) ([]GetOverdueCardsRow, error) {
+	rows, err := q.db.Query(ctx, getOverdueCards)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetOverdueCardsRow
+	for rows.Next() {
+		var i GetOverdueCardsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ListID,
+			&i.Title,
+			&i.Description,
+			&i.Position,
+			&i.DueDate,
+			&i.CreatedAt,
+			&i.ListName,
+			&i.BoardID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const moveCard = `-- name: MoveCard :exec
 UPDATE cards
 SET list_id = $2, position = $3
@@ -121,6 +341,88 @@ type MoveCardParams struct {
 func (q *Queries) MoveCard(ctx context.Context, arg MoveCardParams) error {
 	_, err := q.db.Exec(ctx, moveCard, arg.ID, arg.ListID, arg.Position)
 	return err
+}
+
+const moveCardWithinList = `-- name: MoveCardWithinList :exec
+UPDATE cards
+SET position = $2
+WHERE id = $1
+`
+
+type MoveCardWithinListParams struct {
+	ID       int32
+	Position int32
+}
+
+func (q *Queries) MoveCardWithinList(ctx context.Context, arg MoveCardWithinListParams) error {
+	_, err := q.db.Exec(ctx, moveCardWithinList, arg.ID, arg.Position)
+	return err
+}
+
+const reorderCardsAfterDelete = `-- name: ReorderCardsAfterDelete :exec
+UPDATE cards
+SET position = position - 1
+WHERE list_id = $1 AND position > $2
+`
+
+type ReorderCardsAfterDeleteParams struct {
+	ListID   pgtype.Int4
+	Position int32
+}
+
+func (q *Queries) ReorderCardsAfterDelete(ctx context.Context, arg ReorderCardsAfterDeleteParams) error {
+	_, err := q.db.Exec(ctx, reorderCardsAfterDelete, arg.ListID, arg.Position)
+	return err
+}
+
+const searchCards = `-- name: SearchCards :many
+SELECT c.id, c.list_id, c.title, c.description, c.position, c.due_date, c.created_at, l.name as list_name, l.board_id
+FROM cards c
+JOIN lists l ON c.list_id = l.id
+WHERE c.title ILIKE '%' || $1 || '%' OR c.description ILIKE '%' || $1 || '%'
+ORDER BY c.created_at DESC
+`
+
+type SearchCardsRow struct {
+	ID          int32
+	ListID      pgtype.Int4
+	Title       string
+	Description string
+	Position    int32
+	DueDate     pgtype.Timestamp
+	CreatedAt   pgtype.Timestamp
+	ListName    string
+	BoardID     pgtype.Int4
+}
+
+func (q *Queries) SearchCards(ctx context.Context, dollar_1 string) ([]SearchCardsRow, error) {
+	rows, err := q.db.Query(ctx, searchCards, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchCardsRow
+	for rows.Next() {
+		var i SearchCardsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ListID,
+			&i.Title,
+			&i.Description,
+			&i.Position,
+			&i.DueDate,
+			&i.CreatedAt,
+			&i.ListName,
+			&i.BoardID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateCard = `-- name: UpdateCard :one
@@ -144,6 +446,124 @@ func (q *Queries) UpdateCard(ctx context.Context, arg UpdateCardParams) (Card, e
 		arg.Description,
 		arg.DueDate,
 	)
+	var i Card
+	err := row.Scan(
+		&i.ID,
+		&i.ListID,
+		&i.Title,
+		&i.Description,
+		&i.Position,
+		&i.DueDate,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateCardDescription = `-- name: UpdateCardDescription :one
+UPDATE cards
+SET description = $2
+WHERE id = $1
+RETURNING id, list_id, title, description, position, due_date, created_at
+`
+
+type UpdateCardDescriptionParams struct {
+	ID          int32
+	Description string
+}
+
+func (q *Queries) UpdateCardDescription(ctx context.Context, arg UpdateCardDescriptionParams) (Card, error) {
+	row := q.db.QueryRow(ctx, updateCardDescription, arg.ID, arg.Description)
+	var i Card
+	err := row.Scan(
+		&i.ID,
+		&i.ListID,
+		&i.Title,
+		&i.Description,
+		&i.Position,
+		&i.DueDate,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateCardDueDate = `-- name: UpdateCardDueDate :one
+UPDATE cards
+SET due_date = $2
+WHERE id = $1
+RETURNING id, list_id, title, description, position, due_date, created_at
+`
+
+type UpdateCardDueDateParams struct {
+	ID      int32
+	DueDate pgtype.Timestamp
+}
+
+func (q *Queries) UpdateCardDueDate(ctx context.Context, arg UpdateCardDueDateParams) (Card, error) {
+	row := q.db.QueryRow(ctx, updateCardDueDate, arg.ID, arg.DueDate)
+	var i Card
+	err := row.Scan(
+		&i.ID,
+		&i.ListID,
+		&i.Title,
+		&i.Description,
+		&i.Position,
+		&i.DueDate,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateCardPosition = `-- name: UpdateCardPosition :exec
+UPDATE cards
+SET position = $2
+WHERE id = $1
+`
+
+type UpdateCardPositionParams struct {
+	ID       int32
+	Position int32
+}
+
+func (q *Queries) UpdateCardPosition(ctx context.Context, arg UpdateCardPositionParams) error {
+	_, err := q.db.Exec(ctx, updateCardPosition, arg.ID, arg.Position)
+	return err
+}
+
+const updateCardPositions = `-- name: UpdateCardPositions :exec
+UPDATE cards
+SET position = 
+    CASE
+        WHEN id = ANY($1::int[]) THEN 
+            (array_position($1::int[], id) - 1)
+        ELSE position
+    END
+WHERE list_id = $2
+`
+
+type UpdateCardPositionsParams struct {
+	Column1 []int32
+	ListID  pgtype.Int4
+}
+
+func (q *Queries) UpdateCardPositions(ctx context.Context, arg UpdateCardPositionsParams) error {
+	_, err := q.db.Exec(ctx, updateCardPositions, arg.Column1, arg.ListID)
+	return err
+}
+
+const updateCardTitle = `-- name: UpdateCardTitle :one
+UPDATE cards
+SET title = $2
+WHERE id = $1
+RETURNING id, list_id, title, description, position, due_date, created_at
+`
+
+type UpdateCardTitleParams struct {
+	ID    int32
+	Title string
+}
+
+func (q *Queries) UpdateCardTitle(ctx context.Context, arg UpdateCardTitleParams) (Card, error) {
+	row := q.db.QueryRow(ctx, updateCardTitle, arg.ID, arg.Title)
 	var i Card
 	err := row.Scan(
 		&i.ID,
