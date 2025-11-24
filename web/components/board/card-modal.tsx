@@ -88,11 +88,11 @@ export function CardModal({ card, onClose, onUpdate, onDelete }: CardModalProps)
 
   return (
     <div
-      className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fade-in"
+      className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 "
       onClick={onClose}
     >
       <div
-        className="w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-border rounded-xl bg-card animate-slide-up"
+        className="w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-border rounded-xl bg-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

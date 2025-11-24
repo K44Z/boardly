@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -41,7 +42,7 @@ func (h *ListHandler) CreateListHandler(c *fiber.Ctx) error {
 	if err := c.BodyParser(req); err != nil {
 		return utils.SendError(c, http.StatusBadRequest, utils.ParsingError.Error(), err)
 	}
-
+	fmt.Println(req)
 	list, err := h.service.CreateList(c.Context(), req.BoardID, req.Name, req.Position)
 	if err != nil {
 		return utils.SendError(c, http.StatusInternalServerError, "error creating list", err)

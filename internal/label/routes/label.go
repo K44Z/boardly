@@ -2,12 +2,14 @@ package routes
 
 import (
 	"github.com/K44Z/boardly/internal/label/handlers"
+	"github.com/K44Z/boardly/internal/label/services"
 	"github.com/gofiber/fiber/v2"
 )
 
-func SetupLabelRoutes(app *fiber.App, labelHandler *handlers.LabelHandler) {
+func SetupLabelRoutes(app *fiber.App, s *services.LabelService) {
 	// Label management routes
 	labels := app.Group("/api/labels")
+	labelHandler := handlers.NewLabelHandler(s)
 
 	// Label CRUD operations
 	labels.Post("/", labelHandler.CreateLabel)                        // POST /api/labels

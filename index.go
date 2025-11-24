@@ -2,18 +2,17 @@ package main
 
 import (
 	br "github.com/K44Z/boardly/internal/board/routes"
-
-	bs "github.com/K44Z/boardly/internal/board/services"
+	la "github.com/K44Z/boardly/internal/label/routes"
+	li "github.com/K44Z/boardly/internal/list/routes"
 	ur "github.com/K44Z/boardly/internal/user/routes"
-
-	us "github.com/K44Z/boardly/internal/user/services"
 	"github.com/K44Z/boardly/shared/schemas"
 	"github.com/gofiber/fiber/v2"
 )
 
-func SetupRoutes(app *fiber.App, db *schemas.DB) {
-	BoardService := bs.NewBoardService(db)
-	UserService := us.NewUserService(db)
-	br.NewBoardRouter(app, &BoardService)
-	ur.NewUserRouter(app, &UserService)
+func SetupRoutes(app *fiber.App, services *Services, db *schemas.DB) {
+	br.NewBoardRouter(app, &services.BoardService)
+	ur.NewUserRouter(app, &services.UserService)
+	la.SetupLabelRoutes(app, &services.LabelService)
+	li.NewListRouter(app, &services.ListService)
+
 }

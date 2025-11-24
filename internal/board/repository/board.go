@@ -17,6 +17,7 @@ type BoardRepository interface {
 	UpdateBoard(ctx context.Context, id *int32, name *string) (*schemas.Board, error)
 	DeleteBoard(ctx context.Context, id *int32) error
 	CountBoardMembers(ctx context.Context, boardId *int32) (int64, error)
+	GetBoardWithListsAndCards(ctx context.Context, boardId *int32) (*schemas.BoardWithListsAndCards, error)
 }
 
 type boardrepo struct {
@@ -113,4 +114,62 @@ func (r *boardrepo) CountBoardMembers(ctx context.Context, boardId *int32) (int6
 		Int32: *boardId,
 		Valid: true,
 	})
+}
+func (r *boardrepo) GetBoardWithListsAndCards(ctx context.Context, boardId *int32) (*schemas.BoardWithListsAndCards, error) {
+	res, err := r.queries.GetBoardWithListsAndCards(ctx, *boardId)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res) == 0 {
+		return nil, nil
+	}
+
+	first := res[0]
+	board := &schemas.BoardWithListsAndCards{
+		ID:            first.BoardID,
+		Name:          first.BoardName,
+		OwnerID:       first.OwnerID.Int32,
+		CreatedAt:     first.BoardCreatedAt.Time,
+		OwnerUsername: first.OwnerUsername,
+		OwnerEmail:    first.OwnerEmail,
+		Lists:         []schemas.ListWithCards{},
+	}
+
+	listMap := make(map[int32]*schemas.ListWithCards)
+
+	for _, row := range res {
+		if !row.ListID.Valid {
+			continue
+		}
+
+		listID := row.ListID.Int32
+
+		if _, exists := listMap[listID]; !exists {
+			listMap[listID] = &schemas.ListWithCards{
+				ID:        listID,
+				Name:      row.ListName,
+				Position:  row.ListPosition.Int32,
+				CreatedAt: row.ListCreatedAt.Time,
+				Cards:     []schemas.Card{},
+			}
+		}
+
+		if row.CardID.Valid {
+			card := schemas.Card{
+				ID:          row.CardID.Int32,
+				ListID:      listID,
+				Title:       row.CardTitle,
+				Description: nil,
+				Position:    row.CardPosition.Int32,
+			}
+
+			listMap[listID].Cards = append(listMap[listID].Cards, card)
+		}
+	}
+
+	for _, list := range listMap {
+		board.Lists = append(board.Lists, *list)
+	}
+	return board, nil
 }

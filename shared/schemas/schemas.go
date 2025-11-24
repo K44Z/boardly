@@ -123,3 +123,23 @@ type Config struct {
 	DbUrl string
 	Port  string
 }
+
+type BoardWithListsAndCards struct {
+	ID            int32           `json:"id"`
+	Name          string          `json:"name"`
+	OwnerID       int32           `json:"owner_id"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+	OwnerUsername string          `json:"owner_username"`
+	OwnerEmail    string          `json:"owner_email"`
+	Lists         []ListWithCards `json:"lists"`
+}
+
+type ListWithCards struct {
+	ID        int32     `json:"id"`
+	Name      string    `json:"name"`
+	Position  int32     `json:"position"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Cards     []Card    `json:"cards"`
+}

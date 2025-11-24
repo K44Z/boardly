@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE_URL = 'http://localhost:8080';
 
 export interface ApiResponse<T = any> {
   data?: T;
@@ -40,6 +40,27 @@ export interface UpdateBoardRequest {
   name: string;
 }
 
+export interface List {
+  id: string;
+  title: string;
+  cards: Card[];
+}
+
+export interface Card {
+  id: string;
+  title: string;
+  description: string;
+  labels: string[];
+  assignees: string[];
+  comments: number;
+}
+
+export interface BoardWithLists {
+  id: number;
+  title: string;
+  lists: List[];
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -66,6 +87,11 @@ class ApiClient {
         ...options,
         headers,
       });
+
+      // Handle 204 No Content (for delete operations)
+      if (response.status === 204) {
+        return { data: {} as T };
+      }
 
       const data = await response.json();
 
@@ -141,6 +167,69 @@ class ApiClient {
   async deleteBoard(id: number): Promise<ApiResponse> {
     return this.request(`/api/board/${id}`, {
       method: 'DELETE',
+    });
+  }
+
+  // Board with lists and cards
+  async getBoardWithLists(id: number): Promise<ApiResponse<BoardWithLists>> {
+    return this.request<BoardWithLists>(`/api/board/${id}/full`, {
+      method: 'GET',
+    });
+  }
+
+  // List operations
+  async createList(boardId: number, title: string): Promise<ApiResponse<List>> {
+    return this.request<List>(`/api/lists/create`, {
+      method: 'POST',
+      body: JSON.stringify({ name:title, position:0,board_id: boardId}),
+    });
+  }
+
+  async updateListTitle(listId: string, updates: Partial<List>): Promise<ApiResponse<List>> {
+    return this.request<List>(`/api/lists/${listId}/title`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async updateListPosition(listId: string, updates: Partial<List>): Promise<ApiResponse<List>> {
+    return this.request<List>(`/api/lists/${listId}/position`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteList(listId: string): Promise<ApiResponse> {
+    return this.request(`/api/lists/${listId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Card operations
+  async createCard(listId: string, card: Omit<Card, 'id'>): Promise<ApiResponse<Card>> {
+    return this.request<Card>(`/api/lists/${listId}/cards`, {
+      method: 'POST',
+      body: JSON.stringify(card),
+    });
+  }
+
+  async updateCard(cardId: string, updates: Partial<Card>): Promise<ApiResponse<Card>> {
+    return this.request<Card>(`/api/cards/${cardId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteCard(cardId: string): Promise<ApiResponse> {
+    return this.request(`/api/cards/${cardId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async moveCard(cardId: string, targetListId: string): Promise<ApiResponse<Card>> {
+    return this.request<Card>(`/api/cards/${cardId}/move`, {
+      method: 'PATCH',
+      body: JSON.stringify({ listId: targetListId }),
     });
   }
 }

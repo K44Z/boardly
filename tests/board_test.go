@@ -20,8 +20,7 @@ func TestCreateBoardHandler(t *testing.T) {
 	h := handlers.NewBoardHandler(&s)
 	app.Post("/create", h.CreateBoardHandler)
 	payload := &handlers.CreateBoardRequest{
-		Name:    "damn",
-		OwnerId: "1",
+		Name: "damn",
 	}
 	jsonBody, err := json.Marshal(payload)
 	if err != nil {

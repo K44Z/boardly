@@ -14,6 +14,7 @@ type BoardService interface {
 	ListBoardsByUser(ctx context.Context, userId *int32) ([]schemas.BoardWithOwner, error)
 	UpdateBoard(ctx context.Context, id *int32, name *string) (*schemas.Board, error)
 	DeleteBoard(ctx context.Context, id *int32) error
+	GetFullBoard(ctx context.Context, id *int32) (*schemas.BoardWithListsAndCards, error)
 }
 
 type boardService struct {
@@ -77,4 +78,8 @@ func (s *boardService) UpdateBoard(ctx context.Context, id *int32, name *string)
 
 func (s *boardService) DeleteBoard(ctx context.Context, id *int32) error {
 	return s.boardRepo.DeleteBoard(ctx, id)
+}
+
+func (s *boardService) GetFullBoard(ctx context.Context, id *int32) (*schemas.BoardWithListsAndCards, error) {
+	return s.boardRepo.GetBoardWithListsAndCards(ctx, id)
 }

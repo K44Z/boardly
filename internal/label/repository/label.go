@@ -13,8 +13,8 @@ type LabelRepository struct {
 	db *sqlc.Queries
 }
 
-func NewLabelRepository(db *sqlc.Queries) *LabelRepository {
-	return &LabelRepository{db: db}
+func NewLabelRepository(db *schemas.DB) *LabelRepository {
+	return &LabelRepository{db: sqlc.New(db.DBTX)}
 }
 
 // Label CRUD operations

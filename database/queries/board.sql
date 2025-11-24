@@ -1,4 +1,3 @@
-
 -- name: CreateBoard :one
 INSERT INTO boards (name, owner_id)
 VALUES ($1, $2)
@@ -93,4 +92,28 @@ SELECT EXISTS(
 
 -- name: CountBoardMembers :one
 SELECT COUNT(*) FROM memberships WHERE board_id = $1;
+
+-- name: GetBoardWithListsAndCards :many
+SELECT 
+    b.id as board_id,
+    b.name as board_name,
+    b.owner_id,
+    b.created_at as board_created_at,
+    u.username as owner_username,
+    u.email as owner_email,
+    l.id as list_id,
+    l.name as list_name,
+    l.position as list_position,
+    l.created_at as list_created_at,
+    c.id as card_id,
+    c.title as card_title,
+    c.description as card_description,
+    c.position as card_position,
+    c.created_at as card_created_at
+FROM boards b
+JOIN users u ON b.owner_id = u.id
+LEFT JOIN lists l ON b.id = l.board_id
+LEFT JOIN cards c ON l.id = c.list_id
+WHERE b.id = $1
+ORDER BY l.position ASC, c.position ASC;
 

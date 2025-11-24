@@ -4,7 +4,6 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Black & white minimalist theme for Trello-style board */
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -76,8 +75,8 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-inter);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -159,4 +158,46 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+
+/* X Organizations Black Background with Top Glow */
+.x-org-glow-bg {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  background: #000000;
+}
+
+.x-org-glow-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(120, 180, 255, 0.25), transparent 70%), #000000;
+}
+
+.x-org-glow-bg > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Azure Depths */
+.azure-depths-bg {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.azure-depths-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: radial-gradient(125% 125% at 50% 100%, #000000 40%, #010133 100%);
+}
+
+.azure-depths-bg > * {
+  position: relative;
+  z-index: 1;
 }

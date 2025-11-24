@@ -11,8 +11,8 @@ type LabelService struct {
 	repo *repository.LabelRepository
 }
 
-func NewLabelService(repo *repository.LabelRepository) *LabelService {
-	return &LabelService{repo: repo}
+func NewLabelService(db *schemas.DB) *LabelService {
+	return &LabelService{repo: repository.NewLabelRepository(db)}
 }
 
 // Label CRUD operations

@@ -4,16 +4,11 @@ import { ArrowRight, Sparkles, Users, Zap } from "lucide-react";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-black grid-background">
+    <div className="min-h-screen bg-black x-org-glow-bg">
       {/* Header */}
-      <header className="border-b border-border/50 backdrop-blur-sm sticky top-0 z-50 bg-black/80">
+      <header className="border-b border-border/50 backdrop-blur-sm sticky top-0 z-50 bg-transparent">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">
-                T
-              </span>
-            </div>
             <span className="text-xl font-bold">Boardly</span>
           </div>
           <nav className="hidden md:flex items-center gap-8">
@@ -57,7 +52,7 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="container mx-auto px-6 py-24 md:py-32">
         <div className="max-w-5xl mx-auto text-center animate-fade-in">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border/50 bg-card/50 mb-8 animate-slide-up">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border/50 bg-card/50 mb-8">
             <Sparkles className="w-4 h-4" />
             <span className="text-sm text-muted-foreground">
               AI-Powered Collaboration
@@ -97,18 +92,18 @@ export default function LandingPage() {
       </section>
 
       {/* Stats Section */}
-      <section className="border-y border-border/50 bg-card/30 backdrop-blur-sm">
+      <section className="border-y border-border/50 backdrop-blur-sm">
         <div className="container mx-auto px-6 py-16">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-            <div className="text-center md:text-left border-b md:border-b-0 md:border-r border-border/50 pb-8 md:pb-0">
+            <div className="text-center border-b md:border-b-0 md:border-r border-border/50 pb-8 md:pb-0">
               <div className="text-4xl font-bold mb-2">10x faster</div>
               <div className="text-muted-foreground">task organization</div>
             </div>
-            <div className="text-center md:text-left border-b md:border-b-0 md:border-r border-border/50 pb-8 md:pb-0">
-              <div className="text-4xl font-bold mb-2">500% increase</div>
-              <div className="text-muted-foreground">in team productivity</div>
+            <div className="text-center border-b md:border-b-0 md:border-r border-border/50 pb-8 md:pb-0">
+              <div className="text-4xl font-bold mb-2">Free & Self-Hostable</div>
+              <div className="text-muted-foreground">open source forever</div>
             </div>
-            <div className="text-center md:text-left">
+            <div className="text-center">
               <div className="text-4xl font-bold mb-2">AI-powered</div>
               <div className="text-muted-foreground">smart summaries</div>
             </div>
@@ -130,7 +125,7 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="border border-border rounded-lg p-8 bg-card/50 hover:bg-card transition-colors group">
+            <div className="border border-border rounded-lg p-8 bg-transparent hover:bg-card/50 transition-colors group">
               <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Zap className="w-6 h-6" />
               </div>
@@ -141,7 +136,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="border border-border rounded-lg p-8 bg-card/50 hover:bg-card transition-colors group">
+            <div className="border border-border rounded-lg p-8 bg-transparent hover:bg-card/50 transition-colors group">
               <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Sparkles className="w-6 h-6" />
               </div>
@@ -152,7 +147,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="border border-border rounded-lg p-8 bg-card/50 hover:bg-card transition-colors group">
+            <div className="border border-border rounded-lg p-8 bg-transparent hover:bg-card/50 transition-colors group">
               <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Users className="w-6 h-6" />
               </div>

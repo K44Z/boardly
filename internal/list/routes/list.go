@@ -6,12 +6,12 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func NewListRouter(app *fiber.App, s services.ListService) {
-	handler := handlers.NewListHandler(s)
+func NewListRouter(app *fiber.App, s *services.ListService) {
+	handler := handlers.NewListHandler(*s)
 	lists := app.Group("/api/lists")
 
 	// CRUD operations
-	lists.Post("/", handler.CreateListHandler)
+	lists.Post("/create", handler.CreateListHandler)
 	lists.Get("/:id", handler.GetListByIDHandler)
 	lists.Put("/:id/title", handler.UpdateListTitleHandler)
 	lists.Put("/:id/position", handler.UpdateListPositionHandler)

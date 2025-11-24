@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/log"
 )
 
 var UserNotFound = errors.New("User not found")
@@ -11,6 +12,7 @@ var ParsingError = errors.New("Error parsing request")
 var ErrNotFound = errors.New("Not found")
 
 func SendError(c *fiber.Ctx, status int, msg string, err error) error {
+	log.Error(err)
 	return c.Status(status).JSON(fiber.Map{
 		"error": msg + " : " + err.Error(),
 	})
