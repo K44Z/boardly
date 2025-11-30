@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	sqlc "github.com/K44Z/boardly/database/generated"
 	dto "github.com/K44Z/boardly/internal/user"
@@ -116,60 +117,90 @@ func (r *boardrepo) CountBoardMembers(ctx context.Context, boardId *int32) (int6
 	})
 }
 func (r *boardrepo) GetBoardWithListsAndCards(ctx context.Context, boardId *int32) (*schemas.BoardWithListsAndCards, error) {
-	res, err := r.queries.GetBoardWithListsAndCards(ctx, *boardId)
+	boardRes, err := r.queries.GetBoardWithOwner(ctx, *boardId)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to fetch board: " + err.Error())
 	}
 
-	if len(res) == 0 {
-		return nil, nil
-	}
-
-	first := res[0]
 	board := &schemas.BoardWithListsAndCards{
-		ID:            first.BoardID,
-		Name:          first.BoardName,
-		OwnerID:       first.OwnerID.Int32,
-		CreatedAt:     first.BoardCreatedAt.Time,
-		OwnerUsername: first.OwnerUsername,
-		OwnerEmail:    first.OwnerEmail,
+		ID:            boardRes.ID,
+		Name:          boardRes.Name,
+		OwnerID:       boardRes.OwnerID.Int32,
+		CreatedAt:     boardRes.CreatedAt.Time,
+		OwnerUsername: boardRes.OwnerUsername,
+		OwnerEmail:    boardRes.OwnerEmail,
 		Lists:         []schemas.ListWithCards{},
 	}
 
-	listMap := make(map[int32]*schemas.ListWithCards)
+	lists, err := r.queries.GetListsByBoard(ctx, pgtype.Int4{
+		Int32: *boardId,
+		Valid: true,
+	})
+	if err != nil {
+		return nil, errors.New("failed to fetch lists: " + err.Error())
+	}
 
-	for _, row := range res {
-		if !row.ListID.Valid {
-			continue
+	for _, list := range lists {
+		listWithCards := schemas.ListWithCards{
+			ID:        list.ID,
+			Name:      list.Name,
+			Position:  list.Position,
+			CreatedAt: list.CreatedAt.Time,
+			Cards:     []schemas.CardWithDetails{},
 		}
 
-		listID := row.ListID.Int32
-
-		if _, exists := listMap[listID]; !exists {
-			listMap[listID] = &schemas.ListWithCards{
-				ID:        listID,
-				Name:      row.ListName,
-				Position:  row.ListPosition.Int32,
-				CreatedAt: row.ListCreatedAt.Time,
-				Cards:     []schemas.Card{},
-			}
+		cards, err := r.queries.GetCardsByList(ctx, pgtype.Int4{
+			Int32: list.ID,
+			Valid: true,
+		})
+		if err != nil {
+			return nil, errors.New("failed to fetch cards: " + err.Error())
 		}
-
-		if row.CardID.Valid {
-			card := schemas.Card{
-				ID:          row.CardID.Int32,
-				ListID:      listID,
-				Title:       row.CardTitle,
+		for _, card := range cards {
+			cardWithLabels := schemas.CardWithDetails{
+				ID:          card.ID,
+				ListID:      card.ListID.Int32,
+				Title:       card.Title,
 				Description: nil,
-				Position:    row.CardPosition.Int32,
+				Position:    card.Position,
+				Labels:      []schemas.Label{},
+				Assignees:   []schemas.User{},
 			}
 
-			listMap[listID].Cards = append(listMap[listID].Cards, card)
+			desc := card.Description
+			cardWithLabels.Description = &desc
+
+			labels, err := r.queries.GetCardLabels(ctx, card.ID)
+			if err != nil {
+				return nil, errors.New("failed to fetch card labels: " + err.Error())
+			}
+
+			for _, label := range labels {
+				cardWithLabels.Labels = append(cardWithLabels.Labels, schemas.Label{
+					ID:    label.ID,
+					Name:  label.Name,
+					Color: label.Color,
+				})
+			}
+
+			assignees, err := r.queries.GetCardAssignees(ctx, card.ID)
+			if err != nil {
+				return nil, errors.New("failed to fetch card assignees: " + err.Error())
+			}
+
+			for _, assignee := range assignees {
+				cardWithLabels.Assignees = append(cardWithLabels.Assignees, schemas.User{
+					ID:       assignee.ID,
+					Username: assignee.Username,
+					Email:    assignee.Email,
+				})
+			}
+
+			listWithCards.Cards = append(listWithCards.Cards, cardWithLabels)
 		}
+
+		board.Lists = append(board.Lists, listWithCards)
 	}
 
-	for _, list := range listMap {
-		board.Lists = append(board.Lists, *list)
-	}
 	return board, nil
 }

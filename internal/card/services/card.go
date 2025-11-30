@@ -26,6 +26,8 @@ type CardService interface {
 	GetCardsDueSoon(ctx context.Context) ([]schemas.CardWithDetails, error)
 	SearchCards(ctx context.Context, query string) ([]schemas.CardWithDetails, error)
 	CountCardsByList(ctx context.Context, listID int32) (int64, error)
+	AssignUserToCard(ctx context.Context, userId int32, cardId int32) error
+	GetAllCardAssignees(ctx context.Context, cardId int32) ([]schemas.User, error)
 }
 
 type cardService struct {
@@ -104,4 +106,12 @@ func (s *cardService) SearchCards(ctx context.Context, query string) ([]schemas.
 
 func (s *cardService) CountCardsByList(ctx context.Context, listID int32) (int64, error) {
 	return s.repo.CountCardsByList(ctx, listID)
+}
+
+func (s *cardService) AssignUserToCard(ctx context.Context, userId int32, cardId int32) error {
+	return s.repo.AssignUser(ctx, userId, cardId)
+}
+
+func (s *cardService) GetAllCardAssignees(ctx context.Context, cardId int32) ([]schemas.User, error) {
+	return s.repo.GetAllAssignees(ctx, cardId)
 }

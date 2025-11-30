@@ -76,7 +76,7 @@ export default function SignupPage() {
 
         <div className="grid md:grid-cols-2 gap-8">
           {/* Signup form */}
-          <div className="border border-border rounded-xl p-8 bg-card/50 backdrop-blur-sm animate-slide-up">
+          <div className="border border-border rounded-xl p-8 bg-card/50 backdrop-blur-sm">
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-6">
                 <div className="w-10 h-10 bg-primary rounded-md flex items-center justify-center">
@@ -170,9 +170,8 @@ export default function SignupPage() {
             </div>
           </div>
 
-          {/* Benefits section */}
           <div
-            className="hidden md:flex flex-col justify-center space-y-8 animate-slide-up"
+            className="hidden md:flex flex-col justify-center space-y-8"
             style={{ animationDelay: "0.1s" }}
           >
             <div>

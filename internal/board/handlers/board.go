@@ -159,7 +159,8 @@ func (h *BoardHandler) GetFullBoardHandler(c *fiber.Ctx) error {
 	if err != nil {
 		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
 	}
+
 	return c.Status(200).JSON(fiber.Map{
-		"board": *board,
+		"board": board,
 	})
 }

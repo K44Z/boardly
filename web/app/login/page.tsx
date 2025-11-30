@@ -72,7 +72,7 @@ export default function LoginPage() {
         </Link>
 
         {/* Login card */}
-        <div className="border border-border rounded-xl p-8 bg-card/50 backdrop-blur-sm animate-slide-up">
+        <div className="border border-border rounded-xl p-8 bg-card/50 backdrop-blur-sm">
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-6">
               <div className="w-10 h-10 bg-primary rounded-md flex items-center justify-center">

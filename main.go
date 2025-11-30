@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"flag"
 	"log"
 	"os"
 
 	"github.com/K44Z/boardly/database"
+	"github.com/K44Z/boardly/database/seeders"
 	"github.com/K44Z/boardly/internal/ai"
 	b "github.com/K44Z/boardly/internal/board/services"
 	c "github.com/K44Z/boardly/internal/card/services"
@@ -15,6 +19,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
@@ -71,7 +76,7 @@ func setupMiddleware(app *fiber.App) {
 		AllowOrigins:     "http://localhost:3000",
 		AllowCredentials: true,
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
-		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
+		AllowMethods:     "*",
 	}))
 
 	app.Use(logger.New())
@@ -81,13 +86,48 @@ func setupRoutes(app *fiber.App, services *Services, db *schemas.DB) {
 	SetupRoutes(app, services, db)
 }
 
+func SeedDatabase() error {
+	clear := flag.Bool("clear", false, "Clear database before seeding")
+	flag.Parse()
+
+	dbUrl := os.Getenv("GOOSE_DBSTRING")
+	if dbUrl == "" {
+		return errors.New("GOOSE_DBSTRING environment variable is required")
+	}
+
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dbUrl)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	seeder := seeders.NewSeeder(pool)
+
+	if *clear {
+		if err := seeder.Clear(ctx); err != nil {
+			return err
+		}
+	}
+
+	if err := seeder.Seed(ctx); err != nil {
+		return err
+	}
+
+	log.Println("Seeding completed successfully!")
+	return nil
+}
+
 func main() {
 	app := fiber.New()
 
 	setupMiddleware(app)
 
 	PORT, DbUrl := loadConfig()
-
+	// err := SeedDatabase()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 	db, err := setupDatabase(DbUrl, PORT)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)

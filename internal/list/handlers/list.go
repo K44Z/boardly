@@ -47,9 +47,8 @@ func (h *ListHandler) CreateListHandler(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendError(c, http.StatusInternalServerError, "error creating list", err)
 	}
-
 	return c.Status(http.StatusCreated).JSON(fiber.Map{
-		"list": list,
+		"list": *list,
 	})
 }
 
@@ -66,7 +65,7 @@ func (h *ListHandler) GetListByIDHandler(c *fiber.Ctx) error {
 	}
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
-		"list": list,
+		"list": *list,
 	})
 }
 

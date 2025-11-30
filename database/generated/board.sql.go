@@ -230,13 +230,18 @@ SELECT
     c.title as card_title,
     c.description as card_description,
     c.position as card_position,
-    c.created_at as card_created_at
+    c.created_at as card_created_at,
+    lb.id as label_id,
+    lb.name as label_name,
+    lb.color as label_color
 FROM boards b
 JOIN users u ON b.owner_id = u.id
 LEFT JOIN lists l ON b.id = l.board_id
 LEFT JOIN cards c ON l.id = c.list_id
+LEFT JOIN card_labels cl ON c.id = cl.card_id
+LEFT JOIN labels lb ON cl.label_id = lb.id
 WHERE b.id = $1
-ORDER BY l.position ASC, c.position ASC
+ORDER BY l.position ASC, c.position ASC, lb.id ASC
 `
 
 type GetBoardWithListsAndCardsRow struct {
@@ -255,6 +260,9 @@ type GetBoardWithListsAndCardsRow struct {
 	CardDescription string
 	CardPosition    pgtype.Int4
 	CardCreatedAt   pgtype.Timestamp
+	LabelID         pgtype.Int4
+	LabelName       string
+	LabelColor      string
 }
 
 func (q *Queries) GetBoardWithListsAndCards(ctx context.Context, id int32) ([]GetBoardWithListsAndCardsRow, error) {
@@ -282,6 +290,9 @@ func (q *Queries) GetBoardWithListsAndCards(ctx context.Context, id int32) ([]Ge
 			&i.CardDescription,
 			&i.CardPosition,
 			&i.CardCreatedAt,
+			&i.LabelID,
+			&i.LabelName,
+			&i.LabelColor,
 		); err != nil {
 			return nil, err
 		}

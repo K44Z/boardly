@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/K44Z/boardly/internal/card/services"
 	"github.com/K44Z/boardly/shared/utils"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -15,8 +17,8 @@ type CardHandler struct {
 	service services.CardService
 }
 
-func NewCardHandler(s services.CardService) *CardHandler {
-	return &CardHandler{service: s}
+func NewCardHandler(s *services.CardService) *CardHandler {
+	return &CardHandler{service: *s}
 }
 
 type CreateCardRequest struct {
@@ -24,7 +26,7 @@ type CreateCardRequest struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Position    int32  `json:"position"`
-	DueDate     *int64 `json:"due_date"` // Unix timestamp
+	DueDate     *int64 `json:"due_date"`
 }
 
 type UpdateCardRequest struct {
@@ -36,6 +38,9 @@ type UpdateCardRequest struct {
 type MoveCardRequest struct {
 	ListID   int32 `json:"list_id"`
 	Position int32 `json:"position"`
+}
+type AssignUserRequest struct {
+	UserId int32 `json:"user_id"`
 }
 
 func (h *CardHandler) CreateCardHandler(c *fiber.Ctx) error {
@@ -176,8 +181,7 @@ func (h *CardHandler) MoveCardHandler(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendError(c, http.StatusInternalServerError, "error moving card", err)
 	}
-
-	return c.SendStatus(http.StatusOK)
+	return c.Status(http.StatusOK).JSON(fiber.Map{})
 }
 
 func (h *CardHandler) DeleteCardHandler(c *fiber.Ctx) error {
@@ -192,7 +196,7 @@ func (h *CardHandler) DeleteCardHandler(c *fiber.Ctx) error {
 		return utils.SendError(c, http.StatusInternalServerError, "error deleting card", err)
 	}
 
-	return c.SendStatus(http.StatusOK)
+	return c.Status(http.StatusOK).JSON(fiber.Map{})
 }
 
 func (h *CardHandler) GetOverdueCardsHandler(c *fiber.Ctx) error {
@@ -230,5 +234,33 @@ func (h *CardHandler) SearchCardsHandler(c *fiber.Ctx) error {
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"cards": cards,
+	})
+}
+
+func (h *CardHandler) AssignUserToCardHandler(c *fiber.Ctx) error {
+	CardIdStr := c.Params("id")
+	if CardIdStr == "" {
+		utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), errors.New("Card Id cannot be empty"))
+	}
+	cardId, err := strconv.Atoi(CardIdStr)
+	if err != nil {
+		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrBadRequest.Error(), err)
+	}
+	req := &AssignUserRequest{}
+	if err := c.BodyParser(req); err != nil {
+		utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
+	}
+	err = h.service.AssignUserToCard(c.Context(), req.UserId, int32(cardId))
+	if err != nil {
+		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
+	}
+	assignees, err := h.service.GetAllCardAssignees(c.Context(), int32(cardId))
+	if err != nil {
+		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
+	}
+
+	spew.Dump(assignees)
+	return c.Status(200).JSON(fiber.Map{
+		"assignee": assignees,
 	})
 }

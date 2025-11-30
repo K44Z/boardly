@@ -21,6 +21,7 @@ type UserRepository interface {
 	UpdateEmail(ctx context.Context, user *schemas.User) (*schemas.User, error)
 	GetUserById(ctx context.Context, id *int32) (*schemas.User, error)
 	DeleteUser(ctx context.Context, id *int32) error
+	GetAll(ctx context.Context) ([]schemas.User, error)
 }
 
 type userRepository struct {
@@ -114,4 +115,12 @@ func (r *userRepository) DeleteUser(ctx context.Context, id *int32) error {
 		return err
 	}
 	return nil
+}
+
+func (r *userRepository) GetAll(ctx context.Context) ([]schemas.User, error) {
+	users, err := r.queries.ListUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewUsers(users), nil
 }

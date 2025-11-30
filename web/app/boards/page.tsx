@@ -243,7 +243,6 @@ export default function BoardsPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-black x-org-glow-bg">
-      {/* Header */}
       <header className="border-b border-border/50 backdrop-blur-sm sticky top-0 z-50 bg-transparent">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -262,7 +261,6 @@ export default function BoardsPage() {
       </header>
 
       <div className="container mx-auto px-6 py-8">
-        {/* Search and Create */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 animate-fade-in">
           <div>
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
@@ -311,7 +309,7 @@ export default function BoardsPage() {
               {recentBoards.map((board, index) => (
                 <div
                   key={board.id}
-                  className="group animate-fade-in relative"
+                  className="group relative"
                   style={{
                     animationDelay: `${index * 0.05}s`,
                   }}
@@ -433,18 +431,6 @@ export default function BoardsPage() {
                 </div>
               ))}
 
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="border border-dashed border-border rounded-lg p-6 bg-card/30 hover:bg-card/50 hover:border-primary/50 transition-all duration-300 cursor-pointer h-full flex flex-col items-center justify-center gap-3 group animate-fade-in"
-                style={{
-                  animationDelay: `${recentBoards.length * 0.05}s`,
-                }}
-              >
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                  <Plus className="w-6 h-6" />
-                </div>
-                <span className="font-semibold">Create new board</span>
-              </button>
             </div>
           </div>
         )}
@@ -475,6 +461,7 @@ export default function BoardsPage() {
         <div
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fade-in"
           onClick={() => setShowCreateModal(false)}
+          style={{ position: 'fixed' }}
         >
           <div
             className="w-full max-w-md border border-border rounded-xl p-8 bg-card"
@@ -532,6 +519,7 @@ export default function BoardsPage() {
         <div
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fade-in"
           onClick={() => setShowEditModal(false)}
+          style={{ position: 'fixed' }}
         >
           <div
             className="w-full max-w-md border border-border rounded-xl p-8 bg-card"

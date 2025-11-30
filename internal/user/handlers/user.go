@@ -113,7 +113,7 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) SearchUsersHandler(c *fiber.Ctx) error {
-	req := SearchUserRequest{}
+	req := &SearchUserRequest{}
 	if err := c.BodyParser(req); err != nil {
 		return utils.SendError(c, http.StatusBadRequest, utils.ParsingError.Error(), err)
 	}
@@ -140,4 +140,15 @@ func (h *UserHandler) GetUserByIdHandler(c *fiber.Ctx) error {
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"user": *user,
 	})
+}
+
+func (h *UserHandler) GetAllUsersHandler(c *fiber.Ctx) error {
+	users, err := h.service.GetallUsers(c.Context())
+	if err != nil {
+		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
+	}
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"users": users,
+	})
+
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func NewCardRouter(app *fiber.App, s services.CardService) {
+func NewCardRouter(app *fiber.App, s *services.CardService) {
 	handler := handlers.NewCardHandler(s)
 	cards := app.Group("/api/cards")
 
@@ -15,7 +15,7 @@ func NewCardRouter(app *fiber.App, s services.CardService) {
 	cards.Get("/:id", handler.GetCardByIDHandler)
 	cards.Get("/:id/details", handler.GetCardWithDetailsHandler)
 	cards.Put("/:id", handler.UpdateCardHandler)
-	cards.Put("/:id/move", handler.MoveCardHandler)
+	cards.Patch("/:id/move", handler.MoveCardHandler)
 	cards.Delete("/:id", handler.DeleteCardHandler)
 
 	// List/Board operations
@@ -26,4 +26,7 @@ func NewCardRouter(app *fiber.App, s services.CardService) {
 	cards.Get("/overdue", handler.GetOverdueCardsHandler)
 	cards.Get("/due-soon", handler.GetCardsDueSoonHandler)
 	cards.Get("/search", handler.SearchCardsHandler)
+
+	//assignments
+	cards.Post("/:id/assign", handler.AssignUserToCardHandler)
 }

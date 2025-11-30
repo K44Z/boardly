@@ -2,6 +2,7 @@ package main
 
 import (
 	br "github.com/K44Z/boardly/internal/board/routes"
+	ca "github.com/K44Z/boardly/internal/card/routes"
 	la "github.com/K44Z/boardly/internal/label/routes"
 	li "github.com/K44Z/boardly/internal/list/routes"
 	ur "github.com/K44Z/boardly/internal/user/routes"
@@ -14,5 +15,5 @@ func SetupRoutes(app *fiber.App, services *Services, db *schemas.DB) {
 	ur.NewUserRouter(app, &services.UserService)
 	la.SetupLabelRoutes(app, &services.LabelService)
 	li.NewListRouter(app, &services.ListService)
-
+	ca.NewCardRouter(app, &services.CardService)
 }

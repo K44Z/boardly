@@ -6,6 +6,7 @@ import (
 
 	sqlc "github.com/K44Z/boardly/database/generated"
 	dto "github.com/K44Z/boardly/internal/card"
+	userDto "github.com/K44Z/boardly/internal/user"
 	"github.com/K44Z/boardly/shared/schemas"
 	"github.com/K44Z/boardly/shared/utils"
 	"github.com/jackc/pgx/v5"
@@ -32,6 +33,8 @@ type CardRepository interface {
 	SearchCards(ctx context.Context, query string) ([]schemas.CardWithDetails, error)
 	CountCardsByList(ctx context.Context, listID int32) (int64, error)
 	GetCardList(ctx context.Context, id int32) (int32, error)
+	AssignUser(ctx context.Context, userId int32, cardId int32) error
+	GetAllAssignees(ctx context.Context, cardId int32) ([]schemas.User, error)
 }
 
 type cardRepository struct {
@@ -244,4 +247,23 @@ func (r *cardRepository) GetCardList(ctx context.Context, id int32) (int32, erro
 		return 0, err
 	}
 	return result.Int32, nil
+}
+
+func (r *cardRepository) AssignUser(ctx context.Context, userId int32, cardId int32) error {
+	err := r.queries.AssignUserToCard(ctx, sqlc.AssignUserToCardParams{
+		CardID: cardId,
+		UserID: userId,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *cardRepository) GetAllAssignees(ctx context.Context, cardId int32) ([]schemas.User, error) {
+	assignees, err := r.queries.GetCardAssignees(ctx, cardId)
+	if err != nil {
+		return nil, err
+	}
+	return userDto.NewUsers(assignees), err
 }

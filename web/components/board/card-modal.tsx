@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { X, AlignLeft, Tag, Users, MessageSquare, Sparkles, ChevronDown, ChevronUp, Trash2, Send } from "lucide-react"
-import type { Card as CardType } from "@/types/board"
+import type { Card as CardType } from "@/types/types"
 
 interface CardModalProps {
   card: CardType

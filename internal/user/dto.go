@@ -31,5 +31,4 @@ func NewBoard(data *sqlc.GetBoardWithOwnerRow) *schemas.Board {
 		Name:    data.Name,
 		OwnerID: data.OwnerID,
 	}
-
 }

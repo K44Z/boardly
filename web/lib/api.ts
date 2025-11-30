@@ -1,4 +1,5 @@
 const API_BASE_URL = 'http://localhost:8080';
+import { List, Card, Board, BoardWithLists, User, Label } from "@/types/types";
 
 export interface ApiResponse<T = any> {
   data?: T;
@@ -17,21 +18,6 @@ export interface RegisterRequest {
   username: string;
 }
 
-export interface User {
-  id: number;
-  username: string;
-  email: string;
-}
-
-export interface Board {
-  id: number;
-  name: string;
-  owner_id: number;
-  created_at: string;
-  owner_username?: string;
-  member_count?: number;
-}
-
 export interface CreateBoardRequest {
   name: string;
 }
@@ -40,26 +26,8 @@ export interface UpdateBoardRequest {
   name: string;
 }
 
-export interface List {
-  id: string;
-  title: string;
-  cards: Card[];
-}
-
-export interface Card {
-  id: string;
-  title: string;
-  description: string;
-  labels: string[];
-  assignees: string[];
-  comments: number;
-}
-
-export interface BoardWithLists {
-  id: number;
-  title: string;
-  lists: List[];
-}
+// Re-export types from board.ts for convenience
+export type { User, Board, List, Card, BoardWithLists, Label };
 
 class ApiClient {
   private baseUrl: string;
@@ -88,7 +56,6 @@ class ApiClient {
         headers,
       });
 
-      // Handle 204 No Content (for delete operations)
       if (response.status === 204) {
         return { data: {} as T };
       }
@@ -137,7 +104,6 @@ class ApiClient {
     });
   }
 
-  // Board endpoints
   async getBoards(): Promise<ApiResponse<{ boards: Board[] }>> {
     return this.request<{ boards: Board[] }>('/api/board/', {
       method: 'GET',
@@ -178,58 +144,76 @@ class ApiClient {
   }
 
   // List operations
-  async createList(boardId: number, title: string): Promise<ApiResponse<List>> {
+  async createList(boardId: number, name: string): Promise<ApiResponse<List>> {
     return this.request<List>(`/api/lists/create`, {
       method: 'POST',
-      body: JSON.stringify({ name:title, position:0,board_id: boardId}),
+      body: JSON.stringify({ name, position: 0, board_id: boardId }),
     });
   }
 
-  async updateListTitle(listId: string, updates: Partial<List>): Promise<ApiResponse<List>> {
+  async updateListTitle(listId: number, updates: Partial<List>): Promise<ApiResponse<List>> {
     return this.request<List>(`/api/lists/${listId}/title`, {
       method: 'PUT',
       body: JSON.stringify(updates),
     });
   }
 
-  async updateListPosition(listId: string, updates: Partial<List>): Promise<ApiResponse<List>> {
+  async updateListPosition(listId: number, updates: Partial<List>): Promise<ApiResponse<List>> {
     return this.request<List>(`/api/lists/${listId}/position`, {
       method: 'PUT',
       body: JSON.stringify(updates),
     });
   }
 
-  async deleteList(listId: string): Promise<ApiResponse> {
+  async deleteList(listId: number): Promise<ApiResponse> {
     return this.request(`/api/lists/${listId}`, {
       method: 'DELETE',
     });
   }
 
-  // Card operations
-  async createCard(listId: string, card: Omit<Card, 'id'>): Promise<ApiResponse<Card>> {
-    return this.request<Card>(`/api/lists/${listId}/cards`, {
+  async createCard(listId: number, title: string, description?: string, position?: number): Promise<ApiResponse<Card>> {
+    return this.request<Card>(`/api/cards`, {
       method: 'POST',
-      body: JSON.stringify(card),
+      body: JSON.stringify({ 
+        list_id: listId, 
+        title: title, 
+        description: description || "",
+        position: position || 0
+      }),
     });
   }
 
-  async updateCard(cardId: string, updates: Partial<Card>): Promise<ApiResponse<Card>> {
+  async updateCard(cardId: number, updates: Partial<Card>): Promise<ApiResponse<Card>> {
     return this.request<Card>(`/api/cards/${cardId}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
     });
   }
 
-  async deleteCard(cardId: string): Promise<ApiResponse> {
+  async deleteCard(cardId: number): Promise<ApiResponse> {
     return this.request(`/api/cards/${cardId}`, {
       method: 'DELETE',
     });
   }
 
-  async moveCard(cardId: string, targetListId: string): Promise<ApiResponse<Card>> {
+  async moveCard(cardId: number, targetListId: number, position: number): Promise<ApiResponse<Card>> {
     return this.request<Card>(`/api/cards/${cardId}/move`, {
       method: 'PATCH',
-      body: JSON.stringify({ listId: targetListId }),
+      body: JSON.stringify({ list_id: targetListId, position: position }),
+    });
+  }
+
+  async assignUserToCard(cardId: number, userId: number): Promise<ApiResponse<User>> {
+    return this.request<User>(`/api/cards/${cardId}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    });
+  }
+
+  async unassignUserFromCard(cardId: number, userId: number): Promise<ApiResponse> {
+    return this.request(`/api/cards/${cardId}/unassign`, {
+      method: 'DELETE',
+      body: JSON.stringify({ user_id: userId }),
     });
   }
 }

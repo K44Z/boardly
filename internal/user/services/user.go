@@ -15,7 +15,9 @@ type UserService interface {
 	UpdateEmail(ctx context.Context, user *schemas.User) (*schemas.User, error)
 	GetUserById(ctx context.Context, id *int32) (*schemas.User, error)
 	DeleteUser(ctx context.Context, id *int32) error
+	GetallUsers(ctx context.Context) ([]schemas.User, error)
 }
+
 type userService struct {
 	repo repository.UserRepository
 }
@@ -80,4 +82,8 @@ func (s *userService) DeleteUser(ctx context.Context, id *int32) error {
 		return err
 	}
 	return nil
+}
+
+func (s *userService) GetallUsers(ctx context.Context) ([]schemas.User, error) {
+	return s.repo.GetAll(ctx)
 }

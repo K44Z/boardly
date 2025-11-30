@@ -64,6 +64,8 @@ type CardWithDetails struct {
 	DueDate     *pgtype.Timestamp `json:"due_date"`
 	ListName    string            `json:"list_name"`
 	BoardID     int32             `json:"board_id"`
+	Labels      []Label           `json:"labels"`
+	Assignees   []User            `json:"assignees"`
 }
 
 type Label struct {
@@ -136,10 +138,10 @@ type BoardWithListsAndCards struct {
 }
 
 type ListWithCards struct {
-	ID        int32     `json:"id"`
-	Name      string    `json:"name"`
-	Position  int32     `json:"position"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Cards     []Card    `json:"cards"`
+	ID        int32             `json:"id"`
+	Name      string            `json:"name"`
+	Position  int32             `json:"position"`
+	CreatedAt time.Time         `json:"created_at"`
+	UpdatedAt time.Time         `json:"updated_at"`
+	Cards     []CardWithDetails `json:"cards"`
 }
