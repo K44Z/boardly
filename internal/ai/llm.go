@@ -5,9 +5,21 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+
+	"github.com/K44Z/boardly/shared/utils"
+	"github.com/gofiber/fiber/v2"
 )
 
 type AiService struct{}
+type AiHandler struct {
+	service *AiService
+}
+
+func NewAiHandler(service *AiService) *AiHandler {
+	return &AiHandler{
+		service: service,
+	}
+}
 
 func NewAIService() *AiService {
 	return &AiService{}
@@ -55,4 +67,19 @@ func (a *AiService) PromptOllama(model, prompt string) (*OllamaResponse, error) 
 		return nil, err
 	}
 	return &jsonReponse, nil
+}
+
+func (h *AiHandler) PromptHandler(c *fiber.Ctx) error {
+	req := &OllamaRequest{}
+	if err := c.BodyParser(req); err != nil {
+		utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
+	}
+	res, err := h.service.PromptOllama(req.Model, req.Prompt)
+	if err != nil {
+		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"response": res,
+	})
+
 }

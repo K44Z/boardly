@@ -88,9 +88,10 @@ type Session struct {
 }
 
 type User struct {
-	ID        int32
-	Email     string
-	Password  string
-	Username  string
-	CreatedAt pgtype.Timestamp
+	ID           int32
+	Email        string
+	Password     string
+	Username     string
+	CreatedAt    pgtype.Timestamp
+	ProfileImage string
 }

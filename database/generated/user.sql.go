@@ -51,7 +51,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, email, password)
 VALUES ($1, $2, $3)
-RETURNING id, email, password, username, created_at
+RETURNING id, email, password, username, created_at, profile_image
 `
 
 type CreateUserParams struct {
@@ -69,6 +69,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Password,
 		&i.Username,
 		&i.CreatedAt,
+		&i.ProfileImage,
 	)
 	return i, err
 }
@@ -144,7 +145,7 @@ func (q *Queries) GetSessionByToken(ctx context.Context, token string) (GetSessi
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password, username, created_at FROM users WHERE email = $1
+SELECT id, email, password, username, created_at, profile_image FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -156,12 +157,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Password,
 		&i.Username,
 		&i.CreatedAt,
+		&i.ProfileImage,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password, username, created_at FROM users WHERE id = $1
+SELECT id, email, password, username, created_at, profile_image FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id int32) (User, error) {
@@ -173,12 +175,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id int32) (User, error) {
 		&i.Password,
 		&i.Username,
 		&i.CreatedAt,
+		&i.ProfileImage,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, email, password, username, created_at FROM users WHERE username = $1
+SELECT id, email, password, username, created_at, profile_image FROM users WHERE username = $1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -190,6 +193,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Password,
 		&i.Username,
 		&i.CreatedAt,
+		&i.ProfileImage,
 	)
 	return i, err
 }
@@ -227,7 +231,7 @@ func (q *Queries) GetUserSessions(ctx context.Context, userID pgtype.Int4) ([]Se
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, password, username, created_at FROM users ORDER BY created_at DESC
+SELECT id, email, password, username, created_at, profile_image FROM users ORDER BY created_at DESC
 `
 
 func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
@@ -245,6 +249,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 			&i.Password,
 			&i.Username,
 			&i.CreatedAt,
+			&i.ProfileImage,
 		); err != nil {
 			return nil, err
 		}
@@ -257,7 +262,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 }
 
 const listUsersPaginated = `-- name: ListUsersPaginated :many
-SELECT id, email, password, username, created_at FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2
+SELECT id, email, password, username, created_at, profile_image FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2
 `
 
 type ListUsersPaginatedParams struct {
@@ -280,6 +285,7 @@ func (q *Queries) ListUsersPaginated(ctx context.Context, arg ListUsersPaginated
 			&i.Password,
 			&i.Username,
 			&i.CreatedAt,
+			&i.ProfileImage,
 		); err != nil {
 			return nil, err
 		}
@@ -292,7 +298,7 @@ func (q *Queries) ListUsersPaginated(ctx context.Context, arg ListUsersPaginated
 }
 
 const searchUsers = `-- name: SearchUsers :many
-SELECT id, email, password, username, created_at FROM users 
+SELECT id, email, password, username, created_at, profile_image FROM users 
 WHERE username ILIKE '%' || $1 || '%' OR email ILIKE '%' || $1 || '%'
 ORDER BY created_at DESC
 `
@@ -312,6 +318,7 @@ func (q *Queries) SearchUsers(ctx context.Context, dollar_1 string) ([]User, err
 			&i.Password,
 			&i.Username,
 			&i.CreatedAt,
+			&i.ProfileImage,
 		); err != nil {
 			return nil, err
 		}
@@ -352,7 +359,7 @@ const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET username = $2, email = $3
 WHERE id = $1
-RETURNING id, email, password, username, created_at
+RETURNING id, email, password, username, created_at, profile_image
 `
 
 type UpdateUserParams struct {
@@ -370,6 +377,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.Password,
 		&i.Username,
 		&i.CreatedAt,
+		&i.ProfileImage,
 	)
 	return i, err
 }
@@ -378,7 +386,7 @@ const updateUserEmail = `-- name: UpdateUserEmail :one
 UPDATE users
 SET email = $2
 WHERE id = $1
-RETURNING id, email, password, username, created_at
+RETURNING id, email, password, username, created_at, profile_image
 `
 
 type UpdateUserEmailParams struct {
@@ -395,6 +403,7 @@ func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams
 		&i.Password,
 		&i.Username,
 		&i.CreatedAt,
+		&i.ProfileImage,
 	)
 	return i, err
 }
@@ -403,7 +412,7 @@ const updateUserPassword = `-- name: UpdateUserPassword :one
 UPDATE users
 SET password = $2
 WHERE id = $1
-RETURNING id, email, password, username, created_at
+RETURNING id, email, password, username, created_at, profile_image
 `
 
 type UpdateUserPasswordParams struct {
@@ -420,6 +429,7 @@ func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPassword
 		&i.Password,
 		&i.Username,
 		&i.CreatedAt,
+		&i.ProfileImage,
 	)
 	return i, err
 }
@@ -428,7 +438,7 @@ const updateUserUsername = `-- name: UpdateUserUsername :one
 UPDATE users
 SET username = $2
 WHERE id = $1
-RETURNING id, email, password, username, created_at
+RETURNING id, email, password, username, created_at, profile_image
 `
 
 type UpdateUserUsernameParams struct {
@@ -445,6 +455,7 @@ func (q *Queries) UpdateUserUsername(ctx context.Context, arg UpdateUserUsername
 		&i.Password,
 		&i.Username,
 		&i.CreatedAt,
+		&i.ProfileImage,
 	)
 	return i, err
 }

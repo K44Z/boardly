@@ -2,10 +2,14 @@
 
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Calendar, MessageSquare, Paperclip, AlertCircle, UserPlus } from "lucide-react"
-import type { Card as CardType } from "@/types/types"
+import { Calendar, MessageSquare, Paperclip, AlertCircle, UserPlus, Tag, ChevronDown, X, Check, Loader2 } from "lucide-react"
+import type { Card as CardType, Label } from "@/types/types"
 import Image from "next/image"
 import { AssigneeDropdown } from "./assignee-dropdown"
+import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react"
+import { api } from "@/lib/api"
+import { useToast } from "@/hooks/use-toast"
 
 interface CardProps {
   card: CardType
@@ -13,9 +17,16 @@ interface CardProps {
   isDragging?: boolean
   onAssignUser?: (userId: number) => void
   onUnassignUser?: (userId: number) => void
+  onCardUpdate?: (updatedCard: CardType) => void
 }
 
-export function Card({ card, onClick, isDragging = false, onAssignUser, onUnassignUser }: CardProps) {
+export function Card({ card, onClick, isDragging = false, onAssignUser, onUnassignUser, onCardUpdate }: CardProps) {
+  const { toast } = useToast()
+  const [showLabelDropdown, setShowLabelDropdown] = useState(false)
+  const [availableLabels, setAvailableLabels] = useState<Label[]>([])
+  const [loadingLabels, setLoadingLabels] = useState(false)
+  const [localCard, setLocalCard] = useState<CardType>(card)
+
   const {
     attributes,
     listeners,
@@ -36,6 +47,76 @@ export function Card({ card, onClick, isDragging = false, onAssignUser, onUnassi
   const isDueSoon = card.due_date && new Date(card.due_date) < new Date(Date.now() + 24 * 60 * 60 * 1000);
   const isOverdue = card.due_date && new Date(card.due_date) < new Date();
 
+  // Load available labels when component mounts
+  useEffect(() => {
+    const loadAvailableLabels = async () => {
+      setLoadingLabels(true)
+      try {
+        const response = await api.getAvailableLabels()
+        if (response.data?.labels) {
+          setAvailableLabels(response.data.labels)
+        }
+      } catch (err) {
+        console.error("Failed to load labels:", err)
+      } finally {
+        setLoadingLabels(false)
+      }
+    }
+
+    loadAvailableLabels()
+  }, [])
+
+  // Update local card when prop changes
+  useEffect(() => {
+    setLocalCard(card)
+  }, [card])
+
+  const handleToggleLabel = async (label: Label) => {
+    const hasLabel = localCard.labels?.some(l => l.id === label.id)
+
+    try {
+      if (hasLabel) {
+        const response = await api.removeLabelFromCard(localCard.id, label.id)
+        
+        if (response.error) {
+          throw new Error(response.error)
+        }
+
+        const updatedLabels = localCard.labels?.filter(l => l.id !== label.id) || []
+        const updatedCard = { ...localCard, labels: updatedLabels }
+        setLocalCard(updatedCard)
+        onCardUpdate?.(updatedCard)
+        
+        toast({
+          title: "Success",
+          description: `Removed label "${label.name}"`,
+        })
+      } else {
+        const response = await api.addLabelToCard(localCard.id, label.id)
+        
+        if (response.error) {
+          throw new Error(response.error)
+        }
+
+        const updatedLabels = [...(localCard.labels || []), label]
+        const updatedCard = { ...localCard, labels: updatedLabels }
+        setLocalCard(updatedCard)
+        onCardUpdate?.(updatedCard)
+        
+        toast({
+          title: "Success",
+          description: `Added label "${label.name}"`,
+        })
+      }
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: hasLabel ? "Failed to remove label" : "Failed to add label",
+      })
+    }
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -44,7 +125,7 @@ export function Card({ card, onClick, isDragging = false, onAssignUser, onUnassi
       {...listeners}
       onClick={onClick}
       className={`
-        relative overflow-hidden
+        relative
         border border-border/50 rounded-xl p-4 
         bg-gradient-to-br from-card to-card/50
         hover:from-card hover:to-card/80
@@ -59,22 +140,102 @@ export function Card({ card, onClick, isDragging = false, onAssignUser, onUnassi
       <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       
       <div className="relative z-10">
-        <h4 className="font-semibold text-base mb-3 group-hover:text-primary transition-colors duration-200 leading-snug">
-          {card.title}
-        </h4>
-        {card.labels && card.labels.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {card.labels.map((label) => (
-              <span
-                key={label.id}
-                className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm transition-transform hover:scale-105"
-                style={{ 
-                  backgroundColor: label.color,
-                  boxShadow: `0 2px 8px ${label.color}33`
+        <div className="flex items-start justify-between mb-3">
+          <h4 className="font-semibold text-base group-hover:text-primary transition-colors duration-200 leading-snug flex-1">
+            {localCard.title}
+          </h4>
+          
+          {/* Label Management Button */}
+          <div className="relative ml-2" onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => setShowLabelDropdown(!showLabelDropdown)}
+            >
+              <Tag className="w-3 h-3" />
+            </Button>
+
+            {/* Label Dropdown */}
+            {showLabelDropdown && (
+              <div className="fixed top-auto right-auto mt-1 w-48 bg-background rounded-lg border border-border shadow-xl z-[60]"
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  zIndex: 60
                 }}
               >
-                {label.name}
-              </span>
+                <div className="p-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-xs">Labels</h4>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-4 w-4"
+                      onClick={() => setShowLabelDropdown(false)}
+                    >
+                      <X className="w-2 h-2" />
+                    </Button>
+                  </div>
+                  
+                  {loadingLabels ? (
+                    <div className="flex items-center justify-center py-3">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span className="ml-2 text-xs">Loading...</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {availableLabels.map((label) => {
+                        const isSelected = localCard?.labels?.some(l => l.id === label.id)
+                        return (
+                          <label
+                            key={label.id}
+                            className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer transition-colors"
+                          >
+                            <div className="relative">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => handleToggleLabel(label)}
+                                className="sr-only"
+                              />
+                              <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors ${
+                                isSelected 
+                                  ? 'bg-primary border-primary text-primary-foreground' 
+                                  : 'border-muted-foreground/30 hover:border-primary/50'
+                              }`}>
+                                {isSelected && <Check className="w-2 h-2" />}
+                              </div>
+                            </div>
+                            <div
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: label.color }}
+                            />
+                            <span className="text-xs font-medium flex-1">{label.name}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {localCard.labels && localCard.labels.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {localCard.labels.map((label) => (
+              <div key={label.id}>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-muted/50 border border-border">
+                  <div
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: label.color }}
+                  />
+                  <span className="leading-none text-foreground">{label.name}</span>
+                </div>
+              </div>
             ))}
           </div>
         )}

@@ -100,3 +100,6 @@ WHERE l.board_id = $1
 GROUP BY l.id
 ORDER BY usage_count DESC, l.name
 LIMIT $2;
+
+-- name: GetAllLabels :many 
+SELECT * FROM labels;

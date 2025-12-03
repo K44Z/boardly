@@ -12,6 +12,7 @@ func SetupLabelRoutes(app *fiber.App, s *services.LabelService) {
 	labelHandler := handlers.NewLabelHandler(s)
 
 	// Label CRUD operations
+	labels.Get("/all", labelHandler.GetALLLabelsHandler)
 	labels.Post("/", labelHandler.CreateLabel)                        // POST /api/labels
 	labels.Get("/:id", labelHandler.GetLabelByID)                     // GET /api/labels/:id
 	labels.Get("/:id/with-count", labelHandler.GetLabelWithCardCount) // GET /api/labels/:id/with-count
@@ -32,11 +33,10 @@ func SetupLabelRoutes(app *fiber.App, s *services.LabelService) {
 	boards.Get("/:boardId/labels/most-used", labelHandler.GetMostUsedLabels)       // GET /api/boards/:boardId/labels/most-used?limit=10
 
 	// Card-label association routes
-	cards := app.Group("/api/cards")
 
-	cards.Get("/:cardId/labels", labelHandler.GetCardLabels)                    // GET /api/cards/:cardId/labels
-	cards.Post("/:cardId/labels", labelHandler.AddLabelToCard)                  // POST /api/cards/:cardId/labels
-	cards.Delete("/:cardId/labels/:labelId", labelHandler.RemoveLabelFromCard)  // DELETE /api/cards/:cardId/labels/:labelId
-	cards.Delete("/:cardId/labels", labelHandler.RemoveAllLabelsFromCard)       // DELETE /api/cards/:cardId/labels
-	cards.Get("/:cardId/labels/:labelId/check", labelHandler.CheckCardHasLabel) // GET /api/cards/:cardId/labels/:labelId/check
+	labels.Get("/:cardId/labels", labelHandler.GetCardLabels)                    // GET /api/cards/:cardId/labels
+	labels.Post("/:cardId/labels", labelHandler.AddLabelToCard)                  // POST /api/cards/:cardId/labels
+	labels.Delete("/:cardId/labels/:labelId", labelHandler.RemoveLabelFromCard)  // DELETE /api/cards/:cardId/labels/:labelId
+	labels.Delete("/:cardId/labels", labelHandler.RemoveAllLabelsFromCard)       // DELETE /api/cards/:cardId/labels
+	labels.Get("/:cardId/labels/:labelId/check", labelHandler.CheckCardHasLabel) // GET /api/cards/:cardId/labels/:labelId/check
 }

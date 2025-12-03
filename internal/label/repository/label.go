@@ -5,6 +5,7 @@ import (
 
 	sqlc "github.com/K44Z/boardly/database/generated"
 	"github.com/K44Z/boardly/internal/label"
+	dto "github.com/K44Z/boardly/internal/label"
 	"github.com/K44Z/boardly/shared/schemas"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -230,4 +231,12 @@ func (r *LabelRepository) CheckCardHasLabel(ctx context.Context, cardID, labelID
 		return false, err
 	}
 	return result, nil
+}
+
+func (r *LabelRepository) GetAll(ctx context.Context) ([]schemas.Label, error) {
+	result, err := r.db.GetAllLabels(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewLabels(result), nil
 }

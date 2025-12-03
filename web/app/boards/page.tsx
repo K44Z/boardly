@@ -318,76 +318,65 @@ export default function BoardsPage() {
                     {/* Gradient overlay on hover */}
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                     
-                    <Link href={`/board/${board.id}`} className="absolute inset-0 z-0">
+                    {/* Blur overlay when dropdown is open */}
+                    {openDropdownId === board.id && (
+                      <div className="absolute inset-0 backdrop-blur-sm bg-black/20 z-[5] pointer-events-none transition-all duration-200" />
+                    )}
+                    
+                    <Link href={`/board/${board.id}`} className="absolute inset-0 z-[1]">
                       <span className="sr-only">View {board.name}</span>
                     </Link>
                     
-                    <div className="flex items-start justify-between mb-4 relative z-10">
-                      <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/60 rounded-lg shadow-md flex items-center justify-center">
-                        <span className="text-primary-foreground font-bold text-xl">
-                          {board.name.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }}
-                          className="cursor-pointer"
-                        >
-                        </button>
-                        <DropdownMenu 
-                          open={openDropdownId === board.id}
-                          onOpenChange={(open) => setOpenDropdownId(open ? board.id : null)}
-                        >
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-accent rounded-md flex items-center justify-center"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                              }}
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent 
-                            align="end" 
-                            className="z-[100]"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <DropdownMenuItem 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditBoard(board, e);
-                                setOpenDropdownId(null);
-                              }}
-                            >
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteBoard(board, e);
-                                setOpenDropdownId(null);
-                              }}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                    
-                    <div className="relative z-0 pointer-events-none">
-                      <h3 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors">
+                    <div className="flex items-start justify-between mb-4 relative">
+                      <h3 className="font-bold text-lg group-hover:text-primary transition-colors">
                         {board.name}
                       </h3>
-                      
+                      <DropdownMenu 
+                        open={openDropdownId === board.id}
+                        onOpenChange={(open) => setOpenDropdownId(open ? board.id : null)}
+                      >
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-accent rounded-md flex items-center justify-center relative z-[2]"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent 
+                          align="end" 
+                          className="z-[100]"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditBoard(board, e);
+                              setOpenDropdownId(null);
+                            }}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteBoard(board, e);
+                              setOpenDropdownId(null);
+                            }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    
+                    <div className="relative space-y-3">
                       {/* Member Avatars */}
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex -space-x-2">

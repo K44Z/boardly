@@ -9,11 +9,12 @@ import (
 )
 
 type User struct {
-	ID       int32   `json:"id"`
-	Email    string  `json:"email"`
-	Password string  `json:"-"`
-	Username string  `json:"username"`
-	Boards   []Board `json:"boards"`
+	ID           int32   `json:"id"`
+	Email        string  `json:"email"`
+	Password     string  `json:"-"`
+	Username     string  `json:"username"`
+	Boards       []Board `json:"boards"`
+	ProfileImage string  `json:"profile_image"`
 }
 type Board struct {
 	ID        int32

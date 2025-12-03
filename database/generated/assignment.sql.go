@@ -217,7 +217,7 @@ func (q *Queries) GetBoardAssignments(ctx context.Context, boardID pgtype.Int4) 
 }
 
 const getCardAssignees = `-- name: GetCardAssignees :many
-SELECT u.id, u.email, u.password, u.username, u.created_at
+SELECT u.id, u.email, u.password, u.username, u.created_at, u.profile_image
 FROM users u
 JOIN assignments a ON u.id = a.user_id
 WHERE a.card_id = $1
@@ -239,6 +239,7 @@ func (q *Queries) GetCardAssignees(ctx context.Context, cardID int32) ([]User, e
 			&i.Password,
 			&i.Username,
 			&i.CreatedAt,
+			&i.ProfileImage,
 		); err != nil {
 			return nil, err
 		}

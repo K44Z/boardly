@@ -120,6 +120,7 @@ func SeedDatabase() error {
 
 func main() {
 	app := fiber.New()
+	app.Static("/static", "./static")
 
 	setupMiddleware(app)
 

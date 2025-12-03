@@ -15,55 +15,23 @@ import {
 } from "@dnd-kit/core";
 import { List } from "@/components/board/list";
 import { Card } from "@/components/board/card";
-import { CardModal } from "@/components/board/card-modal";
 import type { List as ColumnType, Card as CardType } from "@/lib/api"; // Updated import
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 
-const AVATARS = [
-  {
-    src: "https://pbs.twimg.com/profile_images/1948770261848756224/oPwqXMD6_400x400.jpg",
-    fallback: "SK",
-    tooltip: "Skyleen",
-  },
-  {
-    src: "https://pbs.twimg.com/profile_images/1593304942210478080/TUYae5z7_400x400.jpg",
-    fallback: "CN",
-    tooltip: "Shadcn",
-  },
-  {
-    src: "https://pbs.twimg.com/profile_images/1677042510839857154/Kq4tpySA_400x400.jpg",
-    fallback: "AW",
-    tooltip: "Adam Wathan",
-  },
-  {
-    src: "https://pbs.twimg.com/profile_images/1783856060249595904/8TfcCN0r_400x400.jpg",
-    fallback: "GR",
-    tooltip: "Guillermo Rauch",
-  },
-  {
-    src: "https://pbs.twimg.com/profile_images/1534700564810018816/anAuSfkp_400x400.jpg",
-    fallback: "JH",
-    tooltip: "Jhey",
-  },
-  {
-    src: "https://pbs.twimg.com/profile_images/1927474594102784000/Al0g-I6o_400x400.jpg",
-    fallback: "DH",
-    tooltip: "David Haz",
-  },
-];
 
 interface BoardPageProps {
   params: { id: string };
 }
 
 export default function BoardPage({ params }: BoardPageProps) {
+  const router = useRouter();
   const {toast}  = useToast();
   const [lists, setLists] = useState<ColumnType[]>([]);
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
-  const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [boardTitle, setBoardTitle] = useState('');
@@ -87,7 +55,6 @@ export default function BoardPage({ params }: BoardPageProps) {
     }),
   );
 
-  // Load board data on mount
   useEffect(() => {
     const loadBoard = async () => {
       try {
@@ -229,7 +196,6 @@ export default function BoardPage({ params }: BoardPageProps) {
 
     setIsCreatingCard(true);
     try {
-      // Calculate the position for the new card (append to end of list)
       const targetList = lists.find(list => list.id === createCardListId);
       const newPosition = targetList ? targetList.cards.length : 0;
       
@@ -240,16 +206,15 @@ export default function BoardPage({ params }: BoardPageProps) {
       }
 
       if (response.data) {
-        // Ensure the card has all required fields with defaults
         const createdCard: CardType = {
-          id: response.data.id,
-          list_id: response.data.list_id || createCardListId,
-          title: response.data.title || newCardTitle,
-          description: response.data.description,
-          position: response.data.position || newPosition,
-          labels: response.data.labels || [],
-          assignees: response.data.assignees || [],
-          due_date: response.data.due_date,
+          id: response.data.card.id,
+          list_id: response.data.card.list_id || createCardListId,
+          title: response.data.card.title || newCardTitle,
+          description: response.data.card.description,
+          position: response.data.card.position || newPosition,
+          labels: response.data.card.labels || [],
+          assignees: response.data.card.assignees || [],
+          due_date: response.data.card.due_date,
         };
         
         setLists((prevLists) =>
@@ -300,7 +265,6 @@ export default function BoardPage({ params }: BoardPageProps) {
             ),
           })),
         );
-        setSelectedCard(updated);
       }
     } catch (err) {
       console.error('Error updating card:', err);
@@ -313,10 +277,10 @@ export default function BoardPage({ params }: BoardPageProps) {
   };
 
   const handleDeleteCard = async () => {
-    if (!selectedCard) return;
+    if (!activeCard) return;
 
     try {
-      const response = await api.deleteCard(selectedCard.id);
+      const response = await api.deleteCard(activeCard.id);
       
       if (response.error) {
         throw new Error(response.error);
@@ -325,10 +289,10 @@ export default function BoardPage({ params }: BoardPageProps) {
       setLists((prevLists) =>
         prevLists.map((list) => ({
           ...list,
-          cards: list.cards.filter((card) => card.id !== selectedCard.id),
+          cards: list.cards.filter((card) => card.id !== activeCard.id),
         })),
       );
-      setSelectedCard(null);
+      setActiveCard(null);
     } catch (err) {
       console.error('Error deleting card:', err);
       toast({
@@ -391,7 +355,7 @@ export default function BoardPage({ params }: BoardPageProps) {
             card.id === cardId
               ? {
                   ...card,
-                  assignees: response.data?.assignees || [],
+                  assignees: response?.data?.assignees || [],
                 }
               : card
           ),
@@ -418,8 +382,6 @@ export default function BoardPage({ params }: BoardPageProps) {
       if (response.error) {
         throw new Error(response.error)
       }
-
-      // Update local state
       setLists((prevLists) =>
         prevLists.map((list) => ({
           ...list,
@@ -534,7 +496,6 @@ export default function BoardPage({ params }: BoardPageProps) {
         </div>
       </header>
 
-      {/* Board */}
       <div className="p-6 overflow-x-auto pl-12 pr-12">
         <DndContext
           sensors={sensors}
@@ -549,7 +510,9 @@ export default function BoardPage({ params }: BoardPageProps) {
                 key={list.id}
                 list={list}
                 onAddCard={handleAddCard}
-                onCardClick={(card) => setSelectedCard(card)}
+                onCardClick={(card) => {
+                  router.push(`/board/${params.id}/card/${card.id}`)
+                }}
                 onAssignUser={handleAssignUser}
                 onUnassignUser={handleUnassignUser}
               />
@@ -729,16 +692,6 @@ export default function BoardPage({ params }: BoardPageProps) {
             </form>
           </div>
         </div>
-      )}
-
-      {/* Card Details Modal */}
-      {selectedCard && (
-        <CardModal
-          card={selectedCard}
-          onClose={() => setSelectedCard(null)}
-          onUpdate={handleUpdateCard}
-          onDelete={handleDeleteCard}
-        />
       )}
     </div>
   );

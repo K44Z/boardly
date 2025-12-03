@@ -7,19 +7,21 @@ import (
 
 func NewUser(u *sqlc.User, b []schemas.Board) *schemas.User {
 	return &schemas.User{
-		ID:       u.ID,
-		Email:    u.Email,
-		Username: u.Username,
-		Boards:   b,
+		ID:           u.ID,
+		Email:        u.Email,
+		Username:     u.Username,
+		ProfileImage: u.ProfileImage,
+		Boards:       b,
 	}
 }
 func NewUsers(u []sqlc.User) []schemas.User {
 	var users []schemas.User
 	for _, v := range u {
 		users = append(users, schemas.User{
-			ID:       v.ID,
-			Username: v.Username,
-			Email:    v.Email,
+			ID:           v.ID,
+			Username:     v.Username,
+			Email:        v.Email,
+			ProfileImage: v.ProfileImage,
 		})
 	}
 	return users

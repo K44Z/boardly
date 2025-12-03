@@ -287,12 +287,12 @@ func (h *LabelHandler) GetMostUsedLabels(c *fiber.Ctx) error {
 	limitStr := c.Query("limit", "10")
 	limit, err := strconv.ParseInt(limitStr, 10, 32)
 	if err != nil {
-		return utils.SendError(c, http.StatusBadRequest, "Invalid limit parameter", err)
+		utils.SendError(c, http.StatusBadRequest, "Invalid limit parameter", err)
 	}
 
 	labels, err := h.service.GetMostUsedLabels(c.Context(), int32(boardID), int32(limit))
 	if err != nil {
-		return utils.SendError(c, http.StatusInternalServerError, "Failed to get most used labels", err)
+		utils.SendError(c, http.StatusInternalServerError, "Failed to get most used labels", err)
 	}
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
@@ -305,20 +305,20 @@ func (h *LabelHandler) AddLabelToCard(c *fiber.Ctx) error {
 	cardIDStr := c.Params("cardId")
 	cardID, err := strconv.ParseInt(cardIDStr, 10, 32)
 	if err != nil {
-		return utils.SendError(c, http.StatusBadRequest, "Invalid card ID", err)
+		utils.SendError(c, http.StatusBadRequest, "Invalid card ID", err)
 	}
 
 	req := &AddLabelToCardRequest{}
 	if err := c.BodyParser(req); err != nil {
-		return utils.SendError(c, http.StatusBadRequest, "Invalid request body", err)
+		utils.SendError(c, http.StatusBadRequest, "Invalid request body", err)
 	}
 
 	err = h.service.AddLabelToCard(c.Context(), int32(cardID), req.LabelID)
 	if err != nil {
-		return utils.SendError(c, http.StatusInternalServerError, "Failed to add label to card", err)
+		utils.SendError(c, http.StatusInternalServerError, "Failed to add label to card", err)
 	}
+	return c.Status(http.StatusOK).JSON(fiber.Map{})
 
-	return c.SendStatus(http.StatusCreated)
 }
 
 func (h *LabelHandler) RemoveLabelFromCard(c *fiber.Ctx) error {
@@ -412,4 +412,15 @@ func (h *LabelHandler) CheckCardHasLabel(c *fiber.Ctx) error {
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"has_label": hasLabel,
 	})
+}
+
+func (h *LabelHandler) GetALLLabelsHandler(c *fiber.Ctx) error {
+	labels, err := h.service.GetAllLabels(c.Context())
+	if err != nil {
+		utils.SendError(c, http.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
+	}
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"labels": labels,
+	})
+
 }

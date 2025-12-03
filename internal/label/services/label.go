@@ -92,3 +92,8 @@ func (s *LabelService) RemoveAllLabelsFromCard(ctx context.Context, cardID int32
 func (s *LabelService) CheckCardHasLabel(ctx context.Context, cardID, labelID int32) (bool, error) {
 	return s.repo.CheckCardHasLabel(ctx, cardID, labelID)
 }
+
+func (s *LabelService) GetAllLabels(ctx context.Context) ([]schemas.Label, error) {
+	return s.repo.GetAll(ctx)
+}
+

@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
 import { X, AlignLeft, Tag, Users, MessageSquare, Sparkles, ChevronDown, ChevronUp, Trash2, Send } from "lucide-react"
 import type { Card as CardType } from "@/types/types"
 
@@ -130,15 +131,21 @@ export function CardModal({ card, onClose, onUpdate, onDelete }: CardModalProps)
               <h3 className="font-semibold">Labels</h3>
             </div>
             <div className="flex flex-wrap gap-2">
-              {localCard.labels.map((label) => (
-                <span key={label} className="px-3 py-1 rounded-md bg-primary/10 text-sm font-medium">
-                  {label}
-                </span>
-              ))}
+              {localCard.labels && localCard.labels.length > 0 ? (
+                localCard.labels.map((label) => (
+                  <Badge 
+                    key={label.id} 
+                    className="text-white border-0 shadow-sm"
+                    style={{ backgroundColor: label.color }}
+                  >
+                    {label.name}
+                  </Badge>
+                ))
+              ) : null}
               <Button variant="outline" size="sm" className="h-8 bg-transparent">
-                <Tag className="w-3 h-3 mr-2" />
-                Add label
-              </Button>
+            <Tag className="w-3 h-3 mr-2" />
+              Add label
+          </Button>
             </div>
           </div>
 
@@ -149,18 +156,30 @@ export function CardModal({ card, onClose, onUpdate, onDelete }: CardModalProps)
               <h3 className="font-semibold">Assignees</h3>
             </div>
             <div className="flex items-center gap-3">
-              {localCard.assignees.map((assignee) => (
-                <div key={assignee} className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                    <span className="text-sm font-semibold">{assignee}</span>
+              {localCard.assignees && localCard.assignees.length > 0 ? (
+                localCard.assignees.map((assignee) => (
+                  <div key={assignee.id} className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                      {assignee.profile_image ? (
+                        <img 
+                          src={assignee.profile_image} 
+                          alt={assignee.username}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-sm font-semibold">
+                          {assignee.username.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-sm">{assignee.username}</span>
                   </div>
-                  <span className="text-sm">{assignee}</span>
-                </div>
-              ))}
+                ))
+              ) : null}
               <Button variant="outline" size="sm" className="h-8 bg-transparent">
-                <Users className="w-3 h-3 mr-2" />
-                Add assignee
-              </Button>
+            <Users className="w-3 h-3 mr-2" />
+             Add assignee
+          </Button>
             </div>
           </div>
 

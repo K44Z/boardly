@@ -92,6 +92,35 @@ func (q *Queries) DeleteLabel(ctx context.Context, id int32) error {
 	return err
 }
 
+const getAllLabels = `-- name: GetAllLabels :many
+SELECT id, board_id, name, color FROM labels
+`
+
+func (q *Queries) GetAllLabels(ctx context.Context) ([]Label, error) {
+	rows, err := q.db.Query(ctx, getAllLabels)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Label
+	for rows.Next() {
+		var i Label
+		if err := rows.Scan(
+			&i.ID,
+			&i.BoardID,
+			&i.Name,
+			&i.Color,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCardLabels = `-- name: GetCardLabels :many
 SELECT l.id, l.board_id, l.name, l.color
 FROM labels l

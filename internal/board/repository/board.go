@@ -190,9 +190,10 @@ func (r *boardrepo) GetBoardWithListsAndCards(ctx context.Context, boardId *int3
 
 			for _, assignee := range assignees {
 				cardWithLabels.Assignees = append(cardWithLabels.Assignees, schemas.User{
-					ID:       assignee.ID,
-					Username: assignee.Username,
-					Email:    assignee.Email,
+					ID:           assignee.ID,
+					Username:     assignee.Username,
+					Email:        assignee.Email,
+					ProfileImage: assignee.ProfileImage,
 				})
 			}
 

@@ -28,6 +28,7 @@ type CardService interface {
 	CountCardsByList(ctx context.Context, listID int32) (int64, error)
 	AssignUserToCard(ctx context.Context, userId int32, cardId int32) error
 	GetAllCardAssignees(ctx context.Context, cardId int32) ([]schemas.User, error)
+	UnAssignUserFromCard(ctx context.Context, cardId int32, userId int32) error
 }
 
 type cardService struct {
@@ -114,4 +115,8 @@ func (s *cardService) AssignUserToCard(ctx context.Context, userId int32, cardId
 
 func (s *cardService) GetAllCardAssignees(ctx context.Context, cardId int32) ([]schemas.User, error) {
 	return s.repo.GetAllAssignees(ctx, cardId)
+}
+
+func (s *cardService) UnAssignUserFromCard(ctx context.Context, cardId int32, userId int32) error {
+	return s.repo.UnassignUser(ctx, cardId, userId)
 }

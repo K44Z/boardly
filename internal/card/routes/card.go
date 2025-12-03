@@ -29,4 +29,5 @@ func NewCardRouter(app *fiber.App, s *services.CardService) {
 
 	//assignments
 	cards.Post("/:id/assign", handler.AssignUserToCardHandler)
+	cards.Delete("/:id/unassign", handler.UnAssignUserToCardHandler)
 }

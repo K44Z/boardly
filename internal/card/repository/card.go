@@ -35,6 +35,7 @@ type CardRepository interface {
 	GetCardList(ctx context.Context, id int32) (int32, error)
 	AssignUser(ctx context.Context, userId int32, cardId int32) error
 	GetAllAssignees(ctx context.Context, cardId int32) ([]schemas.User, error)
+	UnassignUser(ctx context.Context, cardId int32, userId int32) error
 }
 
 type cardRepository struct {
@@ -78,14 +79,35 @@ func (r *cardRepository) GetCardByID(ctx context.Context, id int32) (*schemas.Ca
 }
 
 func (r *cardRepository) GetCardWithDetails(ctx context.Context, id int32) (*schemas.CardWithDetails, error) {
-	card, err := r.queries.GetCardWithDetails(ctx, id)
+	card, err := r.queries.GetCardByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, utils.ErrNotFound
 		}
 		return nil, err
 	}
-	return dto.NewCardWithDetails(&card), nil
+
+	assignees, err := r.queries.GetCardAssignees(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	labels, err := r.queries.GetCardLabels(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	cardDetails := &schemas.CardWithDetails{
+		ID:          card.ID,
+		Title:       card.Title,
+		Description: &card.Description,
+		Position:    card.Position,
+		ListID:      card.ListID.Int32,
+		Assignees:   userDto.NewUsers(assignees),
+		Labels:      dto.NewLabels(labels),
+	}
+
+	return cardDetails, nil
 }
 
 func (r *cardRepository) GetCardsByList(ctx context.Context, listID int32) ([]schemas.Card, error) {
@@ -266,4 +288,15 @@ func (r *cardRepository) GetAllAssignees(ctx context.Context, cardId int32) ([]s
 		return nil, err
 	}
 	return userDto.NewUsers(assignees), err
+}
+
+func (r *cardRepository) UnassignUser(ctx context.Context, cardId int32, userId int32) error {
+	err := r.queries.UnassignUserFromCard(ctx, sqlc.UnassignUserFromCardParams{
+		CardID: cardId,
+		UserID: userId,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }

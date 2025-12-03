@@ -35,6 +35,21 @@ func NewCards(cards []sqlc.Card) []schemas.Card {
 	return result
 }
 
+func NewLabel(label *sqlc.Label) *schemas.Label {
+	return &schemas.Label{
+		ID:      label.ID,
+		BoardID: label.BoardID.Int32,
+		Name:    label.Name,
+		Color:   label.Color,
+	}
+}
+func NewLabels(labels []sqlc.Label) []schemas.Label {
+	var result []schemas.Label
+	for _, c := range labels {
+		result = append(result, *NewLabel(&c))
+	}
+	return result
+}
 func NewCardWithDetails(c *sqlc.GetCardWithDetailsRow) *schemas.CardWithDetails {
 	var description *string
 	if c.Description != "" {
