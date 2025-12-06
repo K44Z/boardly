@@ -3,8 +3,11 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"os"
 	"strconv"
+	"time"
 
+	rtc "github.com/AgoraIO-Community/go-tokenbuilder/rtctokenbuilder"
 	"github.com/K44Z/boardly/internal/board/services"
 	"github.com/K44Z/boardly/shared/schemas"
 	"github.com/K44Z/boardly/shared/utils"
@@ -161,5 +164,46 @@ func (h *BoardHandler) GetFullBoardHandler(c *fiber.Ctx) error {
 	}
 	return c.Status(200).JSON(fiber.Map{
 		"board": board,
+	})
+}
+
+func (h *BoardHandler) GetAgoraTokenHandler(c *fiber.Ctx) error {
+	boardID := c.Params("id")
+	channelName := "board-" + boardID
+
+	user, ok := c.Locals("user").(*schemas.User)
+	if !ok || user == nil {
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Unauthorized",
+		})
+	}
+
+	appID := os.Getenv("AGORA_APP_ID")
+	appCertificate := os.Getenv("AGORA_APP_CERTIFICATE")
+
+	if appID == "" || appCertificate == "" {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Agora configuration missing",
+		})
+	}
+
+	expireTimeInSeconds := uint32(3600 * 24)
+	currentTimestamp := uint32(time.Now().Unix())
+	privilegeExpiredTs := currentTimestamp + expireTimeInSeconds
+
+	uid := uint32(user.ID)
+
+	token, err := rtc.BuildTokenWithUid(appID, appCertificate, channelName, uid, rtc.RolePublisher, privilegeExpiredTs)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to generate token: " + err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"token":   token,
+		"appId":   appID,
+		"uid":     uid,
+		"channel": channelName,
 	})
 }

@@ -1,9 +1,18 @@
 "use client"
 
 import { useDroppable } from "@dnd-kit/core"
-import { Plus } from "lucide-react"
+import { Plus, MoreHorizontal, Pencil, Trash2, Check, X } from "lucide-react"
 import { Card } from "./card"
 import type { List as ListType, Card as CardType } from "@/types/types"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
 
 interface ListProps {
   list: ListType
@@ -11,9 +20,31 @@ interface ListProps {
   onCardClick: (card: CardType) => void
   onAssignUser?: (cardId: number, userId: number) => void
   onUnassignUser?: (cardId: number, userId: number) => void
+  isEditingTitle?: boolean
+  editingTitle?: string
+  onEditTitle?: (name: string) => void
+  onSaveTitle?: () => void
+  onCancelEdit?: () => void
+  onEdit?: () => void
+  onDelete?: () => void
+  isDeleting?: boolean
 }
 
-export function List({ list, onAddCard, onCardClick, onAssignUser, onUnassignUser }: ListProps) {
+export function List({ 
+  list, 
+  onAddCard, 
+  onCardClick, 
+  onAssignUser, 
+  onUnassignUser,
+  isEditingTitle = false,
+  editingTitle = "",
+  onEditTitle,
+  onSaveTitle,
+  onCancelEdit,
+  onEdit,
+  onDelete,
+  isDeleting = false,
+}: ListProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: list.id,
   })
@@ -27,11 +58,76 @@ export function List({ list, onAddCard, onCardClick, onAssignUser, onUnassignUse
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-lg">{list.name}</h3>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-            {list.cards.length}
-          </span>
+        <div className="flex items-center justify-between mb-4 gap-2">
+          {isEditingTitle ? (
+            <div className="flex items-center gap-2 flex-1">
+              <Input
+                value={editingTitle}
+                onChange={(e) => onEditTitle?.(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    onSaveTitle?.()
+                  } else if (e.key === "Escape") {
+                    onCancelEdit?.()
+                  }
+                }}
+                className="h-8 text-sm font-semibold"
+                autoFocus
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onSaveTitle}
+              >
+                <Check className="w-4 h-4 text-green-600" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onCancelEdit}
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </Button>
+            </div>
+          ) : (
+            <>
+              <h3 className="font-semibold text-foreground flex items-center gap-2">
+                {list.name}
+                <span className="text-xs text-muted-foreground font-normal">
+                  ({list.cards.length})
+                </span>
+              </h3>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 hover:bg-muted transition-colors"
+                    disabled={isDeleting}
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Edit list
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={onDelete} 
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    {isDeleting ? "Deleting..." : "Delete list"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          )}
         </div>
 
         {/* Cards Container */}

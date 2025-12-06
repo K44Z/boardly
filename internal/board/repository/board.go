@@ -123,13 +123,32 @@ func (r *boardrepo) GetBoardWithListsAndCards(ctx context.Context, boardId *int3
 	}
 
 	board := &schemas.BoardWithListsAndCards{
-		ID:            boardRes.ID,
-		Name:          boardRes.Name,
-		OwnerID:       boardRes.OwnerID.Int32,
-		CreatedAt:     boardRes.CreatedAt.Time,
-		OwnerUsername: boardRes.OwnerUsername,
-		OwnerEmail:    boardRes.OwnerEmail,
-		Lists:         []schemas.ListWithCards{},
+		ID:                boardRes.ID,
+		Name:              boardRes.Name,
+		OwnerID:           boardRes.OwnerID.Int32,
+		CreatedAt:         boardRes.CreatedAt.Time,
+		OwnerUsername:     boardRes.OwnerUsername,
+		OwnerEmail:        boardRes.OwnerEmail,
+		OwnerProfileImage: &boardRes.OwnerProfileImage,
+		Lists:             []schemas.ListWithCards{},
+		Members:           []schemas.User{},
+	}
+
+	members, err := r.queries.GetBoardMembers(ctx, pgtype.Int4{
+		Int32: *boardId,
+		Valid: true,
+	})
+	if err != nil {
+		return nil, errors.New("failed to fetch board members: " + err.Error())
+	}
+
+	for _, m := range members {
+		board.Members = append(board.Members, schemas.User{
+			ID:           m.UserID.Int32,
+			Username:     m.Username,
+			Email:        m.Email,
+			ProfileImage: &m.ProfileImage,
+		})
 	}
 
 	lists, err := r.queries.GetListsByBoard(ctx, pgtype.Int4{
@@ -193,7 +212,7 @@ func (r *boardrepo) GetBoardWithListsAndCards(ctx context.Context, boardId *int3
 					ID:           assignee.ID,
 					Username:     assignee.Username,
 					Email:        assignee.Email,
-					ProfileImage: assignee.ProfileImage,
+					ProfileImage: &assignee.ProfileImage,
 				})
 			}
 

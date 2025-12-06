@@ -10,31 +10,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-type AiService struct{}
-type AiHandler struct {
-	service *AiService
-}
-
-func NewAiHandler(service *AiService) *AiHandler {
-	return &AiHandler{
-		service: service,
-	}
-}
-
-func NewAIService() *AiService {
-	return &AiService{}
-}
-
-type OllamaRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Stream bool   `json:"stream"`
-}
-
-type OllamaResponse struct {
-	Response string `json:"response"`
-}
-
 func (a *AiService) PromptOllama(model, prompt string) (*OllamaResponse, error) {
 	if model == "" {
 		model = "qwen2.5:0.5b"

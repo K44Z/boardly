@@ -7,7 +7,7 @@ RETURNING *;
 SELECT * FROM boards WHERE id = $1;
 
 -- name: GetBoardWithOwner :one
-SELECT b.*, u.username as owner_username, u.email as owner_email
+SELECT b.*, u.username as owner_username, u.email as owner_email, COALESCE(u.profile_image, '') as owner_profile_image
 FROM boards b
 JOIN users u ON b.owner_id = u.id
 WHERE b.id = $1;
@@ -20,7 +20,12 @@ SELECT DISTINCT b.*, u.username as owner_username
 FROM boards b
 JOIN users u ON b.owner_id = u.id
 LEFT JOIN memberships m ON b.id = m.board_id
-WHERE b.owner_id = $1 OR m.user_id = $1
+LEFT JOIN lists l ON b.id = l.board_id
+LEFT JOIN cards c ON l.id = c.list_id
+LEFT JOIN assignments a ON c.id = a.card_id
+WHERE b.owner_id = $1 
+   OR m.user_id = $1
+   OR a.user_id = $1
 ORDER BY b.created_at DESC;
 
 -- name: UpdateBoard :one
@@ -53,7 +58,7 @@ SELECT * FROM memberships
 WHERE board_id = $1 AND user_id = $2;
 
 -- name: GetBoardMembers :many
-SELECT m.*, u.username, u.email
+SELECT m.*, u.username, u.email, COALESCE(u.profile_image, '') as profile_image
 FROM memberships m
 JOIN users u ON m.user_id = u.id
 WHERE m.board_id = $1
@@ -82,7 +87,14 @@ DELETE FROM memberships WHERE board_id = $1;
 SELECT EXISTS(
     SELECT 1 FROM boards b
     LEFT JOIN memberships m ON b.id = m.board_id
-    WHERE b.id = $1 AND (b.owner_id = $2 OR m.user_id = $2)
+    LEFT JOIN lists l ON b.id = l.board_id
+    LEFT JOIN cards c ON l.id = c.list_id
+    LEFT JOIN assignments a ON c.id = a.card_id
+    WHERE b.id = $1 AND (
+        b.owner_id = $2 
+        OR m.user_id = $2
+        OR a.user_id = $2
+    )
 ) as has_access;
 
 -- name: CheckBoardOwnership :one
@@ -101,6 +113,7 @@ SELECT
     b.created_at as board_created_at,
     u.username as owner_username,
     u.email as owner_email,
+    COALESCE(u.profile_image, '') as owner_profile_image,
     l.id as list_id,
     l.name as list_name,
     l.position as list_position,

@@ -1,3 +1,5 @@
+github.com/AgoraIO-Community/go-tokenbuilder v1.3.0 h1:x/r/9UnmG9AnWGTH7TkEgbvZJKt2/phl50trw4WP4C4=
+github.com/AgoraIO-Community/go-tokenbuilder v1.3.0/go.mod h1:xqPdaiFG00M1hNN/CCYh8j+NTmkiJsQtqYdf4YAlncA=
 github.com/andybalholm/brotli v1.2.0 h1:ukwgCxwYrmACq68yiUqwIWnGY0cTPox/M94sVwToPjQ=
 github.com/andybalholm/brotli v1.2.0/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=

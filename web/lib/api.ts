@@ -279,6 +279,20 @@ class ApiClient {
       method: "GET",
     });
   }
+
+  updateList(
+    listId: number,
+    name: string,
+  ): Promise<ApiResponse<List>> {
+    return this.request<List>(`/api/lists/${listId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  getAgoraToken(boardId: number): Promise<ApiResponse<{ token: string; appId: string; uid: number; channel: string }>> {
+    return this.request<{ token: string; appId: string; uid: number; channel: string }>(`/api/board/${boardId}/token`);
+  }
 }
 
 export const api = new ApiClient(API_BASE_URL);

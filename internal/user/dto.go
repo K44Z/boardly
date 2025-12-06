@@ -10,7 +10,7 @@ func NewUser(u *sqlc.User, b []schemas.Board) *schemas.User {
 		ID:           u.ID,
 		Email:        u.Email,
 		Username:     u.Username,
-		ProfileImage: u.ProfileImage,
+		ProfileImage: &u.ProfileImage,
 		Boards:       b,
 	}
 }
@@ -21,7 +21,7 @@ func NewUsers(u []sqlc.User) []schemas.User {
 			ID:           v.ID,
 			Username:     v.Username,
 			Email:        v.Email,
-			ProfileImage: v.ProfileImage,
+			ProfileImage: &v.ProfileImage,
 		})
 	}
 	return users

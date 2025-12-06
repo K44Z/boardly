@@ -3,6 +3,7 @@ module github.com/K44Z/boardly
 go 1.24.7
 
 require (
+	github.com/AgoraIO-Community/go-tokenbuilder v1.3.0
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/jackc/pgx/v5 v5.7.6

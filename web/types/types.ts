@@ -50,6 +50,8 @@ export interface BoardWithLists {
     created_at: string;
     owner_username: string;
     owner_email: string;
+    owner_profile_image: string;
     lists: List[];
+    members: User[];
   };
 }

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Plus, MoreHorizontal, Star, Users, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, MoreHorizontal, Star, Users, Loader2, Mic, MicOff, Phone, PhoneOff, Square, Pencil, Trash2 } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -15,17 +15,22 @@ import {
 } from "@dnd-kit/core";
 import { List } from "@/components/board/list";
 import { Card } from "@/components/board/card";
-import type { List as ColumnType, Card as CardType } from "@/lib/api"; // Updated import
+import type { List as ColumnType, Card as CardType, User } from "@/lib/api"; 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import AgoraRTC from "agora-rtc-sdk-ng";
+
 
 
 interface BoardPageProps {
   params: { id: string };
 }
+
+const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+
 
 export default function BoardPage({ params }: BoardPageProps) {
   const router = useRouter();
@@ -35,6 +40,15 @@ export default function BoardPage({ params }: BoardPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [boardTitle, setBoardTitle] = useState('');
+  const [joined, setJoined] = useState(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [audioTrack, setAudioTrack] = useState<any>(null);
+  const [members, setMembers] = useState<User[]>([]);
+  const [remoteUsers, setRemoteUsers] = useState<number[]>([]);
+  const [localUid, setLocalUid] = useState<number | null>(null);
+  const [speakingUsers, setSpeakingUsers] = useState<Set<number>>(new Set());
   
   const [showCreateListModal, setShowCreateListModal] = useState(false);
   const [newListName, setNewListName] = useState("");
@@ -47,6 +61,15 @@ export default function BoardPage({ params }: BoardPageProps) {
   const [newCardDescription, setNewCardDescription] = useState("");
   const [isCreatingCard, setIsCreatingCard] = useState(false);
 
+  const [isRecordingCard, setIsRecordingCard] = useState(false)
+  const [isTranscribingCard, setIsTranscribingCard] = useState(false)
+  const mediaRecorderRefCard = useRef<MediaRecorder | null>(null)
+  const audioChunksRefCard = useRef<Blob[]>([])
+
+  const [editingListId, setEditingListId] = useState<number | null>(null)
+  const [editingListName, setEditingListName] = useState("")
+  const [isDeletingList, setIsDeletingList] = useState<number | null>(null)
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -54,6 +77,97 @@ export default function BoardPage({ params }: BoardPageProps) {
       },
     }),
   );
+    const join = async () => {
+    setIsConnecting(true);
+    try {
+      const response = await api.getAgoraToken(parseInt(params.id));
+      
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      if (response.data) {
+        const { token, appId, uid, channel } = response.data;
+        setLocalUid(uid);
+
+        // Setup event listeners
+        client.removeAllListeners();
+        
+        client.on("user-joined", (user) => {
+            setRemoteUsers(prev => {
+                if (prev.includes(user.uid as number)) return prev;
+                return [...prev, user.uid as number];
+            });
+        });
+        client.on("user-left", (user) => {
+            setRemoteUsers(prev => prev.filter(id => id !== user.uid));
+        });
+        client.on("user-published", async (user, mediaType) => {
+            await client.subscribe(user, mediaType);
+            if (mediaType === "audio") {
+                user.audioTrack?.play();
+            }
+        });
+        client.enableAudioVolumeIndicator();
+        client.on("volume-indicator", (volumes) => {
+            const speaking = new Set<number>();
+            volumes.forEach(v => {
+                if (v.level > 5) { // Threshold
+                    speaking.add(v.uid as number);
+                }
+            });
+            setSpeakingUsers(speaking);
+        });
+
+        await client.join(appId, channel, token, uid);
+        const track = await AgoraRTC.createMicrophoneAudioTrack();
+        await client.publish([track]);
+        setAudioTrack(track);
+        setJoined(true);
+        setShowVoiceModal(false);
+        toast({
+          title: "Connected",
+          description: "Joined voice room successfully",
+        });
+      }
+    } catch (err) {
+      console.error('Error joining voice room:', err);
+      toast({
+        variant: "destructive",
+        title: "Error", 
+        description: "Failed to join voice room",
+      });
+    } finally {
+      setIsConnecting(false);
+    }
+  }
+
+  const leave = async () => {
+    try {
+      if (audioTrack) {
+        audioTrack.close();
+        setAudioTrack(null);
+      }
+      await client.leave();
+      client.removeAllListeners();
+      setRemoteUsers([]);
+      setJoined(false);
+      setIsMuted(false);
+      toast({
+        title: "Disconnected",
+        description: "Left voice room",
+      });
+    } catch (err) {
+      console.error('Error leaving voice room:', err);
+    }
+  }
+
+  const toggleMute = async () => {
+    if (audioTrack) {
+      await audioTrack.setMuted(!isMuted);
+      setIsMuted(!isMuted);
+    }
+  }
 
   useEffect(() => {
     const loadBoard = async () => {
@@ -69,6 +183,16 @@ export default function BoardPage({ params }: BoardPageProps) {
         if (response.data?.board) {
           setLists(response.data.board.lists || []);
           setBoardTitle(response.data.board.name || 'Untitled Board');
+          
+          const owner: User = {
+              id: response.data.board.owner_id,
+              username: response.data.board.owner_username,
+              email: response.data.board.owner_email,
+              profile_image: response.data.board.owner_profile_image || "", 
+          };
+          const boardMembers = response.data.board.members || [];
+          const allMembers = [owner, ...boardMembers.filter(m => m.id !== owner.id)];
+          setMembers(allMembers);
         }
       } catch (err) {
         toast({
@@ -322,7 +446,6 @@ export default function BoardPage({ params }: BoardPageProps) {
       }
 
       if (response.data) {
-        // Add empty cards array for new list
         const newList = { ...response.data, cards: [] };
         setLists(prev => [...prev, newList]);
         setShowCreateListModal(false);
@@ -339,6 +462,75 @@ export default function BoardPage({ params }: BoardPageProps) {
       setIsCreatingList(false);
     }
   };
+
+  const handleEditList = (listId: number, currentName: string) => {
+    setEditingListId(listId)
+    setEditingListName(currentName)
+  }
+
+  const handleUpdateList = async (listId: number) => {
+    if (!editingListName.trim()) return
+
+    try {
+      const response = await api.updateList(listId, editingListName)
+      
+      if (response.error) {
+        throw new Error(response.error)
+      }
+
+      setLists((prevLists) =>
+        prevLists.map((list) =>
+          list.id === listId ? { ...list, name: editingListName } : list
+        )
+      )
+
+      setEditingListId(null)
+      setEditingListName("")
+
+      toast({
+        title: "Success",
+        description: "List updated successfully",
+      })
+    } catch (err) {
+      console.error('Error updating list:', err)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update list",
+      })
+    }
+  }
+
+  const handleDeleteList = async (listId: number) => {
+    if (!confirm("Are you sure you want to delete this list? All cards in this list will be deleted.")) {
+      return
+    }
+
+    setIsDeletingList(listId)
+    try {
+      const response = await api.deleteList(listId)
+      
+      if (response.error) {
+        throw new Error(response.error)
+      }
+
+      setLists((prevLists) => prevLists.filter((list) => list.id !== listId))
+
+      toast({
+        title: "Success",
+        description: "List deleted successfully",
+      })
+    } catch (err) {
+      console.error('Error deleting list:', err)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete list",
+      })
+    } finally {
+      setIsDeletingList(null)
+    }
+  }
 
   const handleAssignUser = async (cardId: number, userId: number) => {
     try {
@@ -410,6 +602,88 @@ export default function BoardPage({ params }: BoardPageProps) {
     }
   }
 
+  const startCardRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRefCard.current = mediaRecorder
+      audioChunksRefCard.current = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRefCard.current.push(event.data)
+        }
+      }
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRefCard.current, { type: 'audio/wav' })
+        await transcribeCardAudio(audioBlob)
+        
+        stream.getTracks().forEach(track => track.stop())
+      }
+
+      mediaRecorder.start()
+      setIsRecordingCard(true)
+      
+      toast({
+        title: "Recording Started",
+        description: "Describe your new card",
+      })
+    } catch (err) {
+      console.error('Error starting recording:', err)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Could not access microphone",
+      })
+    }
+  }
+
+  const stopCardRecording = () => {
+    if (mediaRecorderRefCard.current && mediaRecorderRefCard.current.state === 'recording') {
+      mediaRecorderRefCard.current.stop()
+      setIsRecordingCard(false)
+    }
+  }
+
+  const transcribeCardAudio = async (audioBlob: Blob) => {
+    setIsTranscribingCard(true)
+    
+    try {
+      const formData = new FormData()
+      formData.append('audio', audioBlob, 'card-recording.wav')
+
+      const response = await fetch('http://localhost:8080/api/speech-to-text', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      
+      if (data.text) {
+        setNewCardTitle(data.text)
+        
+        toast({
+          title: "Voice Input Complete",
+          description: "Card title set from voice",
+        })
+      }
+    } catch (err) {
+      console.error('Error transcribing audio:', err)
+      toast({
+        variant: "destructive",
+        title: "Transcription Failed",
+        description: "Could not convert speech to text",
+      })
+    } finally {
+      setIsTranscribingCard(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -456,6 +730,74 @@ export default function BoardPage({ params }: BoardPageProps) {
             </div>
 
             <div className="flex items-center gap-2 pr-6">
+              {/* Voice Room Button */}
+              {!joined ? (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowVoiceModal(true)}
+                  className="gap-2 hover:bg-accent/50 transition-all duration-200 border border-transparent hover:border-border/30"
+                  disabled={isConnecting}
+                >
+                  <Phone className="w-4 h-4" />
+                  <span className="hidden sm:inline font-medium">Voice</span>
+                </Button>
+              ) : (
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-background/50 backdrop-blur-sm border border-border/50 shadow-sm">
+                  {/* Participants */}
+                  <div className="flex -space-x-2 mr-2">
+                    {/* Local User */}
+                    {localUid && (
+                        <div className={`relative rounded-full transition-all duration-300 ${speakingUsers.has(localUid) ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-background' : ''}`}>
+                            <Avatar className="w-8 h-8 border-2 border-background">
+                                <AvatarFallback className="bg-primary/10 text-primary text-xs">ME</AvatarFallback>
+                            </Avatar>
+                        </div>
+                    )}
+                    {/* Remote Users */}
+                    {remoteUsers.map(uid => {
+                        const user = members.find(m => m.id === uid);
+                        return (
+                            <div key={uid} className={`relative rounded-full transition-all duration-300 ${speakingUsers.has(uid) ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-background' : ''}`}>
+                                <Avatar className="w-8 h-8 border-2 border-background" title={user?.username || 'Unknown'}>
+                                    <AvatarImage src={user?.profile_image} />
+                                    <AvatarFallback className="bg-muted text-muted-foreground text-xs">
+                                        {user?.username?.substring(0, 2).toUpperCase() || '??'}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </div>
+                        );
+                    })}
+                  </div>
+
+                  <div className="w-px h-4 bg-border/40"></div>
+
+                  <div className="flex items-center gap-1">
+                    <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={toggleMute}
+                        className={`h-8 w-8 p-0 rounded-full transition-all duration-200 ${
+                        isMuted 
+                            ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400' 
+                            : 'hover:bg-accent text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    </Button>
+                    
+                    <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={leave}
+                        className="h-8 w-8 p-0 rounded-full text-muted-foreground hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-200"
+                    >
+                        <PhoneOff className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <Button 
                 variant="ghost" 
                 size="sm"
@@ -496,7 +838,7 @@ export default function BoardPage({ params }: BoardPageProps) {
         </div>
       </header>
 
-      <div className="p-6 overflow-x-auto pl-12 pr-12">
+      <div className="p-6 pl-12 pr-12">
         <DndContext
           sensors={sensors}
           collisionDetection={rectIntersection}
@@ -506,16 +848,28 @@ export default function BoardPage({ params }: BoardPageProps) {
         >
           <div className="flex gap-6 min-h-[calc(100vh-200px)]">
             {lists.map((list) => (
-              <List
-                key={list.id}
-                list={list}
-                onAddCard={handleAddCard}
-                onCardClick={(card) => {
-                  router.push(`/board/${params.id}/card/${card.id}`)
-                }}
-                onAssignUser={handleAssignUser}
-                onUnassignUser={handleUnassignUser}
-              />
+              <div key={list.id} className="flex-shrink-0 w-80">
+                <List
+                  list={list}
+                  onAddCard={handleAddCard}
+                  onCardClick={(card) => {
+                    router.push(`/board/${params.id}/card/${card.id}`)
+                  }}
+                  onAssignUser={handleAssignUser}
+                  onUnassignUser={handleUnassignUser}
+                  isEditingTitle={editingListId === list.id}
+                  editingTitle={editingListName}
+                  onEditTitle={(name) => setEditingListName(name)}
+                  onSaveTitle={() => handleUpdateList(list.id)}
+                  onCancelEdit={() => {
+                    setEditingListId(null)
+                    setEditingListName("")
+                  }}
+                  onEdit={() => handleEditList(list.id, list.name)}
+                  onDelete={() => handleDeleteList(list.id)}
+                  isDeleting={isDeletingList === list.id}
+                />
+              </div>
             ))}
 
             {/* Add List Button */}
@@ -545,7 +899,7 @@ export default function BoardPage({ params }: BoardPageProps) {
       {/* Create Card Modal */}
       {showCreateCardModal && (
         <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fade-in"
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6"
           onClick={() => {
             setShowCreateCardModal(false);
             setNewCardTitle("");
@@ -564,16 +918,60 @@ export default function BoardPage({ params }: BoardPageProps) {
                 <label className="text-sm font-medium mb-2 block">
                   Card title
                 </label>
-                <Input
-                  placeholder="e.g., Design homepage mockup"
-                  value={newCardTitle}
-                  onChange={(e) => setNewCardTitle(e.target.value)}
-                  required
-                  className="bg-background border-border"
-                  disabled={isCreatingCard}
-                  autoFocus
-                />
+                <div className="relative">
+                  <Input
+                    placeholder="e.g., Design homepage mockup"
+                    value={newCardTitle}
+                    onChange={(e) => setNewCardTitle(e.target.value)}
+                    required
+                    className="bg-background border-border pr-12"
+                    disabled={isCreatingCard || isRecordingCard || isTranscribingCard}
+                    autoFocus
+                  />
+                  
+                  {/* Voice Input Button for Card Title */}
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    {!isRecordingCard && !isTranscribingCard ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={startCardRecording}
+                        className="h-6 w-6 p-0 hover:bg-primary/10"
+                        title="Voice input"
+                      >
+                        <Mic className="w-3 h-3" />
+                      </Button>
+                    ) : isRecordingCard ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={stopCardRecording}
+                        className="h-6 w-6 p-0 text-red-600 animate-pulse"
+                        title="Stop recording"
+                      >
+                        <Square className="w-3 h-3 fill-current" />
+                      </Button>
+                    ) : (
+                      <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                    )}
+                  </div>
+                </div>
+                
+                {isRecordingCard && (
+                  <p className="text-xs text-red-600 mt-1 animate-fade-in">
+                    🔴 Recording... Speak the card title
+                  </p>
+                )}
+                
+                {isTranscribingCard && (
+                  <p className="text-xs text-primary mt-1 animate-fade-in">
+                    Processing voice input...
+                  </p>
+                )}
               </div>
+              
               <div>
                 <label className="text-sm font-medium mb-2 block">
                   Description (optional)
@@ -590,7 +988,7 @@ export default function BoardPage({ params }: BoardPageProps) {
                 <Button
                   type="submit"
                   className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                  disabled={isCreatingCard || !newCardTitle.trim()}
+                  disabled={isCreatingCard || !newCardTitle.trim() || isRecordingCard || isTranscribingCard}
                 >
                   {isCreatingCard ? (
                     <div className="flex items-center gap-2">
@@ -610,7 +1008,7 @@ export default function BoardPage({ params }: BoardPageProps) {
                     setNewCardDescription("");
                     setCreateCardListId(null);
                   }}
-                  disabled={isCreatingCard}
+                  disabled={isCreatingCard || isRecordingCard || isTranscribingCard}
                 >
                   Cancel
                 </Button>
@@ -690,6 +1088,56 @@ export default function BoardPage({ params }: BoardPageProps) {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Voice Room Modal */}
+      {showVoiceModal && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-6"
+          onClick={() => setShowVoiceModal(false)}
+          style={{ position: 'fixed' }}
+        >
+          <div
+            className="w-full max-w-sm bg-card/95 backdrop-blur-xl border border-border/20 rounded-2xl p-8 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center space-y-6">
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-semibold tracking-tight">Join Voice</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Connect with your team members
+                </p>
+              </div>
+              
+              <div className="space-y-3 pt-2">
+                <Button
+                  onClick={join}
+                  className="w-full h-11 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 font-medium rounded-xl"
+                  disabled={isConnecting}
+                >
+                  {isConnecting ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      Connecting
+                    </div>
+                  ) : (
+                    "Join Room"
+                  )}
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowVoiceModal(false)}
+                  className="w-full h-11 text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all duration-200 rounded-xl font-medium"
+                  disabled={isConnecting}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

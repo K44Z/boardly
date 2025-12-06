@@ -15,7 +15,14 @@ const checkBoardAccess = `-- name: CheckBoardAccess :one
 SELECT EXISTS(
     SELECT 1 FROM boards b
     LEFT JOIN memberships m ON b.id = m.board_id
-    WHERE b.id = $1 AND (b.owner_id = $2 OR m.user_id = $2)
+    LEFT JOIN lists l ON b.id = l.board_id
+    LEFT JOIN cards c ON l.id = c.list_id
+    LEFT JOIN assignments a ON c.id = a.card_id
+    WHERE b.id = $1 AND (
+        b.owner_id = $2 
+        OR m.user_id = $2
+        OR a.user_id = $2
+    )
 ) as has_access
 `
 
@@ -169,7 +176,7 @@ func (q *Queries) GetBoardByID(ctx context.Context, id int32) (Board, error) {
 }
 
 const getBoardMembers = `-- name: GetBoardMembers :many
-SELECT m.id, m.board_id, m.user_id, m.role, m.created_at, u.username, u.email
+SELECT m.id, m.board_id, m.user_id, m.role, m.created_at, u.username, u.email, COALESCE(u.profile_image, '') as profile_image
 FROM memberships m
 JOIN users u ON m.user_id = u.id
 WHERE m.board_id = $1
@@ -177,13 +184,14 @@ ORDER BY m.created_at ASC
 `
 
 type GetBoardMembersRow struct {
-	ID        int32
-	BoardID   pgtype.Int4
-	UserID    pgtype.Int4
-	Role      string
-	CreatedAt pgtype.Timestamp
-	Username  string
-	Email     string
+	ID           int32
+	BoardID      pgtype.Int4
+	UserID       pgtype.Int4
+	Role         string
+	CreatedAt    pgtype.Timestamp
+	Username     string
+	Email        string
+	ProfileImage string
 }
 
 func (q *Queries) GetBoardMembers(ctx context.Context, boardID pgtype.Int4) ([]GetBoardMembersRow, error) {
@@ -203,6 +211,7 @@ func (q *Queries) GetBoardMembers(ctx context.Context, boardID pgtype.Int4) ([]G
 			&i.CreatedAt,
 			&i.Username,
 			&i.Email,
+			&i.ProfileImage,
 		); err != nil {
 			return nil, err
 		}
@@ -305,19 +314,20 @@ func (q *Queries) GetBoardWithListsAndCards(ctx context.Context, id int32) ([]Ge
 }
 
 const getBoardWithOwner = `-- name: GetBoardWithOwner :one
-SELECT b.id, b.name, b.owner_id, b.created_at, u.username as owner_username, u.email as owner_email
+SELECT b.id, b.name, b.owner_id, b.created_at, u.username as owner_username, u.email as owner_email, COALESCE(u.profile_image, '') as owner_profile_image
 FROM boards b
 JOIN users u ON b.owner_id = u.id
 WHERE b.id = $1
 `
 
 type GetBoardWithOwnerRow struct {
-	ID            int32
-	Name          string
-	OwnerID       pgtype.Int4
-	CreatedAt     pgtype.Timestamp
-	OwnerUsername string
-	OwnerEmail    string
+	ID                int32
+	Name              string
+	OwnerID           pgtype.Int4
+	CreatedAt         pgtype.Timestamp
+	OwnerUsername     string
+	OwnerEmail        string
+	OwnerProfileImage string
 }
 
 func (q *Queries) GetBoardWithOwner(ctx context.Context, id int32) (GetBoardWithOwnerRow, error) {
@@ -330,6 +340,7 @@ func (q *Queries) GetBoardWithOwner(ctx context.Context, id int32) (GetBoardWith
 		&i.CreatedAt,
 		&i.OwnerUsername,
 		&i.OwnerEmail,
+		&i.OwnerProfileImage,
 	)
 	return i, err
 }
@@ -435,7 +446,12 @@ SELECT DISTINCT b.id, b.name, b.owner_id, b.created_at, u.username as owner_user
 FROM boards b
 JOIN users u ON b.owner_id = u.id
 LEFT JOIN memberships m ON b.id = m.board_id
-WHERE b.owner_id = $1 OR m.user_id = $1
+LEFT JOIN lists l ON b.id = l.board_id
+LEFT JOIN cards c ON l.id = c.list_id
+LEFT JOIN assignments a ON c.id = a.card_id
+WHERE b.owner_id = $1 
+   OR m.user_id = $1
+   OR a.user_id = $1
 ORDER BY b.created_at DESC
 `
 

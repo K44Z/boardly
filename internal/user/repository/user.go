@@ -43,10 +43,11 @@ func (r *userRepository) Exists(ctx context.Context, email *string) (*schemas.Us
 		return nil, err
 	}
 	return &schemas.User{
-		ID:       user.ID,
-		Username: user.Username,
-		Email:    user.Email,
-		Password: user.Password,
+		ID:           user.ID,
+		Username:     user.Username,
+		Email:        user.Email,
+		Password:     user.Password,
+		ProfileImage: &user.ProfileImage,
 	}, nil
 }
 

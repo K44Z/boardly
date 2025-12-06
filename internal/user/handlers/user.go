@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -40,22 +41,17 @@ type GetUserByIdRequest struct {
 func (h *UserHandler) Login(c *fiber.Ctx) error {
 	req := &LoginRequest{}
 	if err := c.BodyParser(req); err != nil {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid credentials : " + err.Error(),
-		})
+		utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
 	}
+	fmt.Println(req)
 	user, err := h.service.CheckUser(c.Context(), &req.Email)
 	if err != nil {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "User already exists : " + err.Error(),
-		})
+		utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
 	}
+	fmt.Println(user.Password, req.Password)
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		log.Println(err)
-		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
-			"error": err.Error() + " / " + user.Password + " / " + req.Password,
-		})
+		utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
 	}
 	token, err := utils.GenerateJWTtoken(&schemas.User{
 		Username: user.Username,
@@ -63,10 +59,7 @@ func (h *UserHandler) Login(c *fiber.Ctx) error {
 	})
 	if err != nil {
 		log.Println(err)
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-
+		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
 	}
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"token": token,
@@ -88,9 +81,7 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 				"error": "User already exists",
 			})
 		}
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		utils.SendError(c, http.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
 	}
 	hashedPass, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -106,10 +97,10 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 		Username: req.Username,
 	})
 	if err != nil {
-		return utils.SendError(c, http.StatusInternalServerError, "", err)
+		utils.SendError(c, http.StatusInternalServerError, "", err)
 
 	}
-	return c.SendStatus(http.StatusCreated)
+	return c.Status(200).JSON(fiber.Map{})
 }
 
 func (h *UserHandler) SearchUsersHandler(c *fiber.Ctx) error {
