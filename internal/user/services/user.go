@@ -16,6 +16,7 @@ type UserService interface {
 	GetUserById(ctx context.Context, id *int32) (*schemas.User, error)
 	DeleteUser(ctx context.Context, id *int32) error
 	GetallUsers(ctx context.Context) ([]schemas.User, error)
+	UpdateProfileImage(ctx context.Context, userID int32, imageURL string) error
 }
 
 type userService struct {
@@ -26,6 +27,10 @@ func NewUserService(db *schemas.DB) UserService {
 	return &userService{
 		repo: repository.NewUserRepository(db),
 	}
+}
+
+func (s *userService) UpdateProfileImage(ctx context.Context, userID int32, imageURL string) error {
+	return s.repo.UpdateProfileImage(ctx, userID, imageURL)
 }
 
 func (s *userService) CheckUser(ctx context.Context, email *string) (*schemas.User, error) {

@@ -109,7 +109,6 @@ func SeedDatabase() error {
 			return err
 		}
 	}
-
 	if err := seeder.Seed(ctx); err != nil {
 		return err
 	}

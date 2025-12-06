@@ -14,4 +14,5 @@ func NewUserRouter(app *fiber.App, s *services.UserService) {
 	user.Get("/userId/:id", handler.GetUserByIdHandler)
 	user.Post("/search", handler.SearchUsersHandler)
 	user.Post("/all", handler.GetAllUsersHandler)
+	user.Post("/upload-profile-image", handler.UploadProfileImage)
 }

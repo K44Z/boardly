@@ -47,6 +47,10 @@ class ApiClient {
       "Content-Type": "application/json",
     };
 
+    if (options.body instanceof FormData) {
+      delete headers["Content-Type"];
+    }
+
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
@@ -207,7 +211,7 @@ class ApiClient {
     updates: Partial<Card>,
   ): Promise<ApiResponse<Card>> {
     return this.request<Card>(`/api/cards/${cardId}`, {
-      method: "PATCH",
+      method: "PUT",
       body: JSON.stringify(updates),
     });
   }
@@ -284,14 +288,23 @@ class ApiClient {
     listId: number,
     name: string,
   ): Promise<ApiResponse<List>> {
-    return this.request<List>(`/api/lists/${listId}`, {
-      method: "PATCH",
+    return this.request<List>(`/api/lists/${listId}/title`, {
+      method: "PUT",
       body: JSON.stringify({ name }),
     });
   }
 
   getAgoraToken(boardId: number): Promise<ApiResponse<{ token: string; appId: string; uid: number; channel: string }>> {
     return this.request<{ token: string; appId: string; uid: number; channel: string }>(`/api/board/${boardId}/token`);
+  }
+
+  async uploadProfileImage(file: File): Promise<ApiResponse<{ image_url: string }>> {
+    const formData = new FormData();
+    formData.append("image", file);
+    return this.request<{ image_url: string }>("/api/user/upload-profile-image", {
+      method: "POST",
+      body: formData,
+    });
   }
 }
 

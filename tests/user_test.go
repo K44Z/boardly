@@ -9,18 +9,12 @@ import (
 	"testing"
 
 	"github.com/K44Z/boardly/internal/user/handlers"
-	"github.com/K44Z/boardly/internal/user/services"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAuthFlow(t *testing.T) {
-	app, db := SetupApp()
+	app, _ := SetupApp()
 
-	service := services.NewUserService(db)
-	handler := handlers.NewUserHandler(&service)
-
-	app.Post("/api/user/register", handler.Register)
-	app.Post("/api/user/login", handler.Login)
 	registerPayload := handlers.RegisterRequest{
 		Email:    "amine@gmail.com",
 		Password: "sfkjsldkfjslkdfj",

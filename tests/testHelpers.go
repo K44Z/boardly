@@ -7,6 +7,19 @@ import (
 
 	_ "github.com/lib/pq"
 
+	"os"
+
+	"github.com/K44Z/boardly/internal/ai"
+	br "github.com/K44Z/boardly/internal/board/routes"
+	bs "github.com/K44Z/boardly/internal/board/services"
+	cr "github.com/K44Z/boardly/internal/card/routes"
+	cs "github.com/K44Z/boardly/internal/card/services"
+	lar "github.com/K44Z/boardly/internal/label/routes"
+	las "github.com/K44Z/boardly/internal/label/services"
+	lr "github.com/K44Z/boardly/internal/list/routes"
+	ls "github.com/K44Z/boardly/internal/list/services"
+	ur "github.com/K44Z/boardly/internal/user/routes"
+	us "github.com/K44Z/boardly/internal/user/services"
 	"github.com/K44Z/boardly/shared/schemas"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,8 +27,12 @@ import (
 )
 
 func SetupApp() (*fiber.App, *schemas.DB) {
+	dbUrl := os.Getenv("TEST_DB_URL")
+	if dbUrl == "" {
+		dbUrl = "postgres://test:test@localhost:5432/test?sslmode=disable"
+	}
 	config := &schemas.Config{
-		DbUrl: "postgres://test:test@localhost:5432/test?sslmode=disable",
+		DbUrl: dbUrl,
 	}
 	app := fiber.New()
 
@@ -27,6 +44,23 @@ func SetupApp() (*fiber.App, *schemas.DB) {
 	if err != nil {
 		log.Fatal("error cleaning tables ")
 	}
+
+	// Initialize Services
+	userService := us.NewUserService(db)
+	boardService := bs.NewBoardService(db)
+	listService := ls.NewListService(db)
+	cardService := cs.NewCardService(db)
+	labelService := las.NewLabelService(db)
+	aiService := ai.NewAIService()
+
+	// Setup Routes
+	ur.NewUserRouter(app, &userService)
+	br.NewBoardRouter(app, &boardService)
+	lr.NewListRouter(app, &listService)
+	cr.NewCardRouter(app, &cardService)
+	lar.SetupLabelRoutes(app, labelService)
+	ai.NewAiRouter(app, aiService)
+
 	return app, db
 }
 

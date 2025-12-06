@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/K44Z/boardly/internal/user/services"
 	"github.com/K44Z/boardly/shared/schemas"
@@ -63,6 +66,7 @@ func (h *UserHandler) Login(c *fiber.Ctx) error {
 	}
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"token": token,
+		"user":  user,
 	})
 
 }
@@ -114,6 +118,64 @@ func (h *UserHandler) SearchUsersHandler(c *fiber.Ctx) error {
 	}
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"users": users,
+	})
+}
+
+func (h *UserHandler) UploadProfileImage(c *fiber.Ctx) error {
+	file, err := c.FormFile("image")
+	if err != nil {
+		return utils.SendError(c, fiber.StatusBadRequest, "Image is required", err)
+	}
+
+	// Create uploads directory if it doesn't exist
+	uploadDir := "./static/uploads"
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		return utils.SendError(c, fiber.StatusInternalServerError, "Failed to create upload directory", err)
+	}
+
+	// Generate unique filename
+	ext := filepath.Ext(file.Filename)
+	filename := fmt.Sprintf("%d_%s%s", time.Now().UnixNano(), "profile", ext)
+	filePath := filepath.Join(uploadDir, filename)
+
+	// Save file
+	if err := c.SaveFile(file, filePath); err != nil {
+		return utils.SendError(c, fiber.StatusInternalServerError, "Failed to save image", err)
+	}
+
+	// Construct URL
+	imageURL := fmt.Sprintf("%s://%s/static/uploads/%s", c.Protocol(), c.Get("Host"), filename)
+
+	return h.updateUserProfileImage(c, imageURL)
+}
+
+func (h *UserHandler) updateUserProfileImage(c *fiber.Ctx, imageURL string) error {
+	// Extract user ID from token
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return utils.SendError(c, fiber.StatusUnauthorized, "Missing authorization header", nil)
+	}
+
+	// Assuming "Bearer <token>"
+	if len(authHeader) < 7 || authHeader[:7] != "Bearer " {
+		return utils.SendError(c, fiber.StatusUnauthorized, "Invalid authorization header", nil)
+	}
+	token := authHeader[7:]
+
+	user, err := utils.Authenticate(token)
+	if err != nil {
+		return utils.SendError(c, fiber.StatusUnauthorized, "Invalid token", err)
+	}
+
+	userID := user.ID
+
+	if err := h.service.UpdateProfileImage(c.Context(), userID, imageURL); err != nil {
+		return utils.SendError(c, fiber.StatusInternalServerError, "Failed to update profile image", err)
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"message":   "Profile image updated successfully",
+		"image_url": imageURL,
 	})
 }
 

@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search, Star, Clock, Users, MoreVertical, Pencil, Trash2, TrendingUp } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
 import { useAuth } from "@/contexts/auth-context";
-import { api, type Board } from "@/lib/api";
+import { api, type Board, type User } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { parseJwt } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,12 +43,39 @@ export default function BoardsPage() {
   const [deletingBoard, setDeletingBoard] = useState<Board | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
-  const { logout } = useAuth();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const { logout, token } = useAuth();
   const { toast } = useToast();
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  };
 
   useEffect(() => {
     fetchBoards();
+    fetchCurrentUser();
   }, []);
+
+  const fetchCurrentUser = async () => {
+    if (!token) return;
+    const decoded = parseJwt(token);
+    // The JWT uses 'sub' for the user ID
+    const userId = decoded?.sub || decoded?.id;
+    
+    if (decoded && userId) {
+      try {
+        const response = await api.getUserById(userId);
+        if (response.data?.user) {
+          setCurrentUser(response.data.user);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user", error);
+      }
+    }
+  };
 
   const fetchBoards = async () => {
     setIsLoading(true);
@@ -253,9 +282,14 @@ export default function BoardsPage() {
             <Button variant="ghost" size="sm" onClick={logout}>
               Logout
             </Button>
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center cursor-pointer hover:bg-primary/30 transition-colors">
-              <span className="text-sm font-semibold">JD</span>
-            </div>
+            <Link href="/profile">
+              <Avatar className="w-8 h-8 cursor-pointer hover:opacity-80 transition-opacity border border-border">
+                <AvatarImage src={currentUser?.profile_image} />
+                <AvatarFallback className="bg-primary/20 text-primary text-xs font-semibold">
+                  {currentUser?.username ? currentUser.username.substring(0, 2).toUpperCase() : "ME"}
+                </AvatarFallback>
+              </Avatar>
+            </Link>
           </div>
         </div>
       </header>

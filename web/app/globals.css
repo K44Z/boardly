@@ -201,3 +201,8 @@
   position: relative;
   z-index: 1;
 }
+
+.bg-dot-pattern {
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 24px 24px;
+}

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Plus, MoreHorizontal, Star, Users, Loader2, Mic, MicOff, Phone, PhoneOff, Square, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, MoreHorizontal, Star, Users, Loader2, Mic, MicOff, Phone, PhoneOff, Square, Pencil, Trash2, AudioLines } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import AgoraRTC from "agora-rtc-sdk-ng";
+import { parseJwt } from "@/lib/utils";
 
 
 
@@ -41,14 +42,15 @@ export default function BoardPage({ params }: BoardPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [boardTitle, setBoardTitle] = useState('');
   const [joined, setJoined] = useState(false);
-  const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [audioTrack, setAudioTrack] = useState<any>(null);
   const [members, setMembers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [remoteUsers, setRemoteUsers] = useState<number[]>([]);
   const [localUid, setLocalUid] = useState<number | null>(null);
   const [speakingUsers, setSpeakingUsers] = useState<Set<number>>(new Set());
+  const joinedRef = useRef(false);
   
   const [showCreateListModal, setShowCreateListModal] = useState(false);
   const [newListName, setNewListName] = useState("");
@@ -77,59 +79,88 @@ export default function BoardPage({ params }: BoardPageProps) {
       },
     }),
   );
-    const join = async () => {
+
+  useEffect(() => {
+    const initVoice = async () => {
+      try {
+        const response = await api.getAgoraToken(parseInt(params.id));
+        
+        if (response.data) {
+          const { token, appId, uid, channel } = response.data;
+          setLocalUid(uid);
+
+          client.removeAllListeners();
+          
+          client.on("user-joined", (user) => {
+              setRemoteUsers(prev => {
+                  if (prev.includes(user.uid as number)) return prev;
+                  return [...prev, user.uid as number];
+              });
+          });
+
+          client.on("user-left", (user) => {
+              setRemoteUsers(prev => prev.filter(id => id !== user.uid));
+          });
+
+          client.on("user-published", async (user, mediaType) => {
+              if (joinedRef.current) {
+                await client.subscribe(user, mediaType);
+                if (mediaType === "audio") {
+                    user.audioTrack?.play();
+                }
+              }
+          });
+
+          client.enableAudioVolumeIndicator();
+          client.on("volume-indicator", (volumes) => {
+              const speaking = new Set<number>();
+              volumes.forEach(v => {
+                  if (v.level > 5) {
+                      speaking.add(v.uid as number);
+                  }
+              });
+              setSpeakingUsers(speaking);
+          });
+
+          await client.join(appId, channel, token, uid);
+        }
+      } catch (err) {
+        console.error('Error initializing voice:', err);
+      }
+    };
+
+    initVoice();
+
+    return () => {
+      client.leave();
+      client.removeAllListeners();
+    };
+  }, [params.id]);
+
+  const join = async () => {
     setIsConnecting(true);
     try {
-      const response = await api.getAgoraToken(parseInt(params.id));
+      // Add a small delay for the animation to be appreciated
+      await new Promise(resolve => setTimeout(resolve, 1200));
       
-      if (response.error) {
-        throw new Error(response.error);
-      }
+      const track = await AgoraRTC.createMicrophoneAudioTrack();
+      await client.publish([track]);
+      setAudioTrack(track);
+      setJoined(true);
+      joinedRef.current = true;
+      
+      // Subscribe to existing users
+      client.remoteUsers.forEach(async (user) => {
+        if (user.hasAudio) {
+          await client.subscribe(user, "audio");
+          user.audioTrack?.play();
+        }
+      });
 
-      if (response.data) {
-        const { token, appId, uid, channel } = response.data;
-        setLocalUid(uid);
-
-        // Setup event listeners
-        client.removeAllListeners();
-        
-        client.on("user-joined", (user) => {
-            setRemoteUsers(prev => {
-                if (prev.includes(user.uid as number)) return prev;
-                return [...prev, user.uid as number];
-            });
-        });
-        client.on("user-left", (user) => {
-            setRemoteUsers(prev => prev.filter(id => id !== user.uid));
-        });
-        client.on("user-published", async (user, mediaType) => {
-            await client.subscribe(user, mediaType);
-            if (mediaType === "audio") {
-                user.audioTrack?.play();
-            }
-        });
-        client.enableAudioVolumeIndicator();
-        client.on("volume-indicator", (volumes) => {
-            const speaking = new Set<number>();
-            volumes.forEach(v => {
-                if (v.level > 5) { // Threshold
-                    speaking.add(v.uid as number);
-                }
-            });
-            setSpeakingUsers(speaking);
-        });
-
-        await client.join(appId, channel, token, uid);
-        const track = await AgoraRTC.createMicrophoneAudioTrack();
-        await client.publish([track]);
-        setAudioTrack(track);
-        setJoined(true);
-        setShowVoiceModal(false);
-        toast({
-          title: "Connected",
-          description: "Joined voice room successfully",
-        });
-      }
+      toast({
+        title: "Connected",
+        description: "Joined voice room successfully",
+      });
     } catch (err) {
       console.error('Error joining voice room:', err);
       toast({
@@ -148,10 +179,17 @@ export default function BoardPage({ params }: BoardPageProps) {
         audioTrack.close();
         setAudioTrack(null);
       }
-      await client.leave();
-      client.removeAllListeners();
-      setRemoteUsers([]);
+      await client.unpublish();
+      
+      // Unsubscribe from all remote users
+      client.remoteUsers.forEach(async (user) => {
+        if (user.hasAudio) {
+          await client.unsubscribe(user, "audio");
+        }
+      });
+
       setJoined(false);
+      joinedRef.current = false;
       setIsMuted(false);
       toast({
         title: "Disconnected",
@@ -168,6 +206,26 @@ export default function BoardPage({ params }: BoardPageProps) {
       setIsMuted(!isMuted);
     }
   }
+
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const decoded = parseJwt(token);
+      const userId = decoded?.sub || decoded?.id;
+      if (userId) {
+        try {
+          const response = await api.getUserById(userId);
+          if (response.data?.user) {
+            setCurrentUser(response.data.user);
+          }
+        } catch (error) {
+          console.error("Failed to fetch user", error);
+        }
+      }
+    };
+    fetchCurrentUser();
+  }, []);
 
   useEffect(() => {
     const loadBoard = async () => {
@@ -709,9 +767,9 @@ export default function BoardPage({ params }: BoardPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-background/95">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-background to-background/95 overflow-hidden">
       {/* Header */}
-      <header className="border-b border-border/50 backdrop-blur-md sticky top-0 z-50 bg-background/80 shadow-sm">
+      <header className="border-b border-border/50 backdrop-blur-md z-50 bg-background/80 shadow-sm flex-shrink-0">
         <div className="mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -730,47 +788,69 @@ export default function BoardPage({ params }: BoardPageProps) {
             </div>
 
             <div className="flex items-center gap-2 pr-6">
+              {/* Participants Display - Always Visible */}
+              {(remoteUsers.length > 0 || (joined && localUid)) && (
+              <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-background/50 backdrop-blur-sm border border-border/50 shadow-sm mr-2">
+                <div className="flex -space-x-2">
+                  {/* Local User - Only show if joined */}
+                  {joined && localUid && (
+                      <div className={`relative rounded-full transition-all duration-300 ${speakingUsers.has(localUid) ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-background scale-110 z-10 shadow-lg shadow-green-500/20' : ''}`}>
+                          <Avatar className="w-8 h-8 border-2 border-background">
+                              <AvatarImage src={currentUser?.profile_image} />
+                              <AvatarFallback className="bg-primary/10 text-primary text-xs">ME</AvatarFallback>
+                          </Avatar>
+                      </div>
+                  )}
+                  {/* Remote Users - Always show */}
+                  {remoteUsers.map(uid => {
+                      const user = members.find(m => m.id === uid);
+                      return (
+                          <div key={uid} className={`relative rounded-full transition-all duration-300 ${speakingUsers.has(uid) ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-background scale-110 z-10 shadow-lg shadow-green-500/20' : ''}`}>
+                              <Avatar className="w-8 h-8 border-2 border-background" title={user?.username || 'Unknown'}>
+                                  <AvatarImage src={user?.profile_image} />
+                                  <AvatarFallback className="bg-muted text-muted-foreground text-xs">
+                                      {user?.username?.substring(0, 2).toUpperCase() || '??'}
+                                  </AvatarFallback>
+                              </Avatar>
+                          </div>
+                      );
+                  })}
+                </div>
+              </div>
+              )}
+
               {/* Voice Room Button */}
               {!joined ? (
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  onClick={() => setShowVoiceModal(true)}
+                  onClick={join}
                   className="gap-2 hover:bg-accent/50 transition-all duration-200 border border-transparent hover:border-border/30"
                   disabled={isConnecting}
                 >
-                  <Phone className="w-4 h-4" />
-                  <span className="hidden sm:inline font-medium">Voice</span>
+                  {isConnecting ? (
+                    <div className="flex items-center gap-0.5 h-4 px-0.5">
+                      <span className="w-0.5 h-2 bg-foreground/60 animate-[pulse_0.7s_ease-in-out_infinite]"></span>
+                      <span className="w-0.5 h-3 bg-foreground/60 animate-[pulse_0.7s_ease-in-out_infinite_0.15s]"></span>
+                      <span className="w-0.5 h-4 bg-foreground/60 animate-[pulse_0.7s_ease-in-out_infinite_0.3s]"></span>
+                      <span className="w-0.5 h-2 bg-foreground/60 animate-[pulse_0.7s_ease-in-out_infinite_0.45s]"></span>
+                    </div>
+                  ) : (
+                    <AudioLines className="w-4 h-4" />
+                  )}
+                  <span className="hidden sm:inline font-medium">
+                    {isConnecting ? "Connecting..." : "Join Voice"}
+                  </span>
                 </Button>
               ) : (
-                <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-background/50 backdrop-blur-sm border border-border/50 shadow-sm">
-                  {/* Participants */}
-                  <div className="flex -space-x-2 mr-2">
-                    {/* Local User */}
-                    {localUid && (
-                        <div className={`relative rounded-full transition-all duration-300 ${speakingUsers.has(localUid) ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-background' : ''}`}>
-                            <Avatar className="w-8 h-8 border-2 border-background">
-                                <AvatarFallback className="bg-primary/10 text-primary text-xs">ME</AvatarFallback>
-                            </Avatar>
-                        </div>
-                    )}
-                    {/* Remote Users */}
-                    {remoteUsers.map(uid => {
-                        const user = members.find(m => m.id === uid);
-                        return (
-                            <div key={uid} className={`relative rounded-full transition-all duration-300 ${speakingUsers.has(uid) ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-background' : ''}`}>
-                                <Avatar className="w-8 h-8 border-2 border-background" title={user?.username || 'Unknown'}>
-                                    <AvatarImage src={user?.profile_image} />
-                                    <AvatarFallback className="bg-muted text-muted-foreground text-xs">
-                                        {user?.username?.substring(0, 2).toUpperCase() || '??'}
-                                    </AvatarFallback>
-                                </Avatar>
-                            </div>
-                        );
-                    })}
+                <div className="flex items-center gap-3 px-4 py-1.5 rounded-full bg-green-500/10 backdrop-blur-sm border border-green-500/20 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center gap-2 mr-1 border-r border-green-500/20 pr-3">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    <span className="text-xs font-medium text-green-600 dark:text-green-400 hidden sm:inline-block">Voice Active</span>
                   </div>
-
-                  <div className="w-px h-4 bg-border/40"></div>
 
                   <div className="flex items-center gap-1">
                     <Button 
@@ -780,8 +860,9 @@ export default function BoardPage({ params }: BoardPageProps) {
                         className={`h-8 w-8 p-0 rounded-full transition-all duration-200 ${
                         isMuted 
                             ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400' 
-                            : 'hover:bg-accent text-muted-foreground hover:text-foreground'
+                            : 'bg-background/50 hover:bg-background text-foreground shadow-sm'
                         }`}
+                        title={isMuted ? "Unmute" : "Mute"}
                     >
                         {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                     </Button>
@@ -791,6 +872,7 @@ export default function BoardPage({ params }: BoardPageProps) {
                         size="sm"
                         onClick={leave}
                         className="h-8 w-8 p-0 rounded-full text-muted-foreground hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-200"
+                        title="Leave Voice"
                     >
                         <PhoneOff className="w-4 h-4" />
                     </Button>
@@ -838,7 +920,7 @@ export default function BoardPage({ params }: BoardPageProps) {
         </div>
       </header>
 
-      <div className="p-6 pl-12 pr-12">
+      <div className="flex-1 overflow-x-auto overflow-y-auto p-6 pl-12 pr-12">
         <DndContext
           sensors={sensors}
           collisionDetection={rectIntersection}
@@ -846,7 +928,7 @@ export default function BoardPage({ params }: BoardPageProps) {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div className="flex gap-6 min-h-[calc(100vh-200px)]">
+          <div className="flex gap-6 h-full items-start">
             {lists.map((list) => (
               <div key={list.id} className="flex-shrink-0 w-80">
                 <List
@@ -1092,55 +1174,7 @@ export default function BoardPage({ params }: BoardPageProps) {
         </div>
       )}
 
-      {/* Voice Room Modal */}
-      {showVoiceModal && (
-        <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-6"
-          onClick={() => setShowVoiceModal(false)}
-          style={{ position: 'fixed' }}
-        >
-          <div
-            className="w-full max-w-sm bg-card/95 backdrop-blur-xl border border-border/20 rounded-2xl p-8 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-center space-y-6">
 
-              <div className="space-y-2">
-                <h3 className="text-xl font-semibold tracking-tight">Join Voice</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Connect with your team members
-                </p>
-              </div>
-              
-              <div className="space-y-3 pt-2">
-                <Button
-                  onClick={join}
-                  className="w-full h-11 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 font-medium rounded-xl"
-                  disabled={isConnecting}
-                >
-                  {isConnecting ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      Connecting
-                    </div>
-                  ) : (
-                    "Join Room"
-                  )}
-                </Button>
-                
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowVoiceModal(false)}
-                  className="w-full h-11 text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all duration-200 rounded-xl font-medium"
-                  disabled={isConnecting}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

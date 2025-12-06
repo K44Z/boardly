@@ -22,16 +22,25 @@ type UserRepository interface {
 	GetUserById(ctx context.Context, id *int32) (*schemas.User, error)
 	DeleteUser(ctx context.Context, id *int32) error
 	GetAll(ctx context.Context) ([]schemas.User, error)
+	UpdateProfileImage(ctx context.Context, userID int32, imageURL string) error
 }
 
 type userRepository struct {
 	queries *sqlc.Queries
+	db      *schemas.DB
 }
 
 func NewUserRepository(db *schemas.DB) UserRepository {
 	return &userRepository{
 		queries: sqlc.New(db.DBTX),
+		db:      db,
 	}
+}
+
+func (r *userRepository) UpdateProfileImage(ctx context.Context, userID int32, imageURL string) error {
+	query := `UPDATE users SET profile_image = $2 WHERE id = $1`
+	_, err := r.db.DBTX.Exec(ctx, query, userID, imageURL)
+	return err
 }
 
 func (r *userRepository) Exists(ctx context.Context, email *string) (*schemas.User, error) {
@@ -69,8 +78,10 @@ func (r *userRepository) GetUserById(ctx context.Context, id *int32) (*schemas.U
 		return nil, err
 	}
 	return &schemas.User{
-		Username: res.Username,
-		Email:    res.Email,
+		ID:           res.ID,
+		Username:     res.Username,
+		Email:        res.Email,
+		ProfileImage: &res.ProfileImage,
 	}, nil
 
 }

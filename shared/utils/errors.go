@@ -10,6 +10,7 @@ import (
 var UserNotFound = errors.New("User not found")
 var ParsingError = errors.New("Error parsing request")
 var ErrNotFound = errors.New("Not found")
+var BadRequest = errors.New("Bad request")
 
 func SendError(c *fiber.Ctx, status int, msg string, err error) error {
 	var message string
