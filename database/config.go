@@ -37,8 +37,8 @@ func RunMigrations(connStr string) {
 	defer sqlDB.Close()
 
 	if err := goose.Up(sqlDB, "./database/migrations"); err != nil {
-		fmt.Println("Error running while doing migration up :", err)
+		fmt.Println("No New migrations Found skipping ...:", err)
 	}
 
-	log.Println("Migrations applied successfully")
+	log.Println("Migrations applied")
 }

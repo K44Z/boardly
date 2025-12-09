@@ -115,6 +115,8 @@ export default function BoardPage({ params }: BoardPageProps) {
   const [isStarred, setIsStarred] = useState(false);
   const [isEditingBoard, setIsEditingBoard] = useState(false);
   const [newBoardTitle, setNewBoardTitle] = useState("");
+  const [showDeleteBoardDialog, setShowDeleteBoardDialog] = useState(false);
+  const [isDeletingBoard, setIsDeletingBoard] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -156,15 +158,12 @@ export default function BoardPage({ params }: BoardPageProps) {
     });
   };
 
-  const handleDeleteBoard = async () => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this board? This action cannot be undone.",
-      )
-    ) {
-      return;
-    }
+  const handleDeleteBoard = () => {
+    setShowDeleteBoardDialog(true);
+  };
 
+  const confirmDeleteBoard = async () => {
+    setIsDeletingBoard(true);
     try {
       const response = await api.deleteBoard(parseInt(params.id));
       if (response.error) {
@@ -181,6 +180,8 @@ export default function BoardPage({ params }: BoardPageProps) {
         title: "Error",
         description: "Failed to delete board",
       });
+      setIsDeletingBoard(false);
+      setShowDeleteBoardDialog(false);
     }
   };
 
@@ -1534,6 +1535,31 @@ export default function BoardPage({ params }: BoardPageProps) {
               className="bg-destructive hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Board Confirmation Dialog */}
+      <AlertDialog open={showDeleteBoardDialog} onOpenChange={setShowDeleteBoardDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Board?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this board? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingBoard}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDeleteBoard();
+              }}
+              disabled={isDeletingBoard}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeletingBoard ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
