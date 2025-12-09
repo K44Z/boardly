@@ -4,7 +4,44 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Plus, MoreHorizontal, Star, Users, Loader2, Mic, MicOff, Phone, PhoneOff, Square, Pencil, Trash2, AudioLines } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  MoreHorizontal,
+  Star,
+  Users,
+  Loader2,
+  Mic,
+  MicOff,
+  Phone,
+  PhoneOff,
+  Square,
+  Pencil,
+  Trash2,
+  AudioLines,
+  Edit,
+  Share2,
+  Check,
+  X,
+  BarChart2,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   DndContext,
   DragOverlay,
@@ -15,7 +52,7 @@ import {
 } from "@dnd-kit/core";
 import { List } from "@/components/board/list";
 import { Card } from "@/components/board/card";
-import type { List as ColumnType, Card as CardType, User } from "@/lib/api"; 
+import type { List as ColumnType, Card as CardType, User } from "@/lib/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -24,23 +61,20 @@ import { useRouter } from "next/navigation";
 import AgoraRTC from "agora-rtc-sdk-ng";
 import { parseJwt } from "@/lib/utils";
 
-
-
 interface BoardPageProps {
   params: { id: string };
 }
 
 const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
 
-
 export default function BoardPage({ params }: BoardPageProps) {
   const router = useRouter();
-  const {toast}  = useToast();
+  const { toast } = useToast();
   const [lists, setLists] = useState<ColumnType[]>([]);
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [boardTitle, setBoardTitle] = useState('');
+  const [boardTitle, setBoardTitle] = useState("");
   const [joined, setJoined] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -51,7 +85,7 @@ export default function BoardPage({ params }: BoardPageProps) {
   const [localUid, setLocalUid] = useState<number | null>(null);
   const [speakingUsers, setSpeakingUsers] = useState<Set<number>>(new Set());
   const joinedRef = useRef(false);
-  
+
   const [showCreateListModal, setShowCreateListModal] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [newListPosition, setNewListPosition] = useState(0);
@@ -63,14 +97,24 @@ export default function BoardPage({ params }: BoardPageProps) {
   const [newCardDescription, setNewCardDescription] = useState("");
   const [isCreatingCard, setIsCreatingCard] = useState(false);
 
-  const [isRecordingCard, setIsRecordingCard] = useState(false)
-  const [isTranscribingCard, setIsTranscribingCard] = useState(false)
-  const mediaRecorderRefCard = useRef<MediaRecorder | null>(null)
-  const audioChunksRefCard = useRef<Blob[]>([])
+  const [isRecordingCard, setIsRecordingCard] = useState(false);
+  const [isTranscribingCard, setIsTranscribingCard] = useState(false);
+  const [recordingTarget, setRecordingTarget] = useState<'title' | 'description' | null>(null);
+  const [recordingTimeCard, setRecordingTimeCard] = useState(0);
+  const mediaRecorderRefCard = useRef<MediaRecorder | null>(null);
+  const audioChunksRefCard = useRef<Blob[]>([]);
+  const recordingIntervalRefCard = useRef<NodeJS.Timeout | null>(null);
 
-  const [editingListId, setEditingListId] = useState<number | null>(null)
-  const [editingListName, setEditingListName] = useState("")
-  const [isDeletingList, setIsDeletingList] = useState<number | null>(null)
+  const [editingListId, setEditingListId] = useState<number | null>(null);
+  const [editingListName, setEditingListName] = useState("");
+  const [isDeletingList, setIsDeletingList] = useState<number | null>(null);
+  const [listToDelete, setListToDelete] = useState<number | null>(null);
+  const [showDeleteListDialog, setShowDeleteListDialog] = useState(false);
+
+  // Board actions state
+  const [isStarred, setIsStarred] = useState(false);
+  const [isEditingBoard, setIsEditingBoard] = useState(false);
+  const [newBoardTitle, setNewBoardTitle] = useState("");
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -81,51 +125,139 @@ export default function BoardPage({ params }: BoardPageProps) {
   );
 
   useEffect(() => {
+    const starred = localStorage.getItem("starred_boards");
+    if (starred) {
+      const starredIds = JSON.parse(starred);
+      setIsStarred(starredIds.includes(params.id));
+    }
+  }, [params.id]);
+
+  const toggleStar = () => {
+    const starred = localStorage.getItem("starred_boards");
+    let starredIds = starred ? JSON.parse(starred) : [];
+
+    if (isStarred) {
+      starredIds = starredIds.filter((id: string) => id !== params.id);
+      toast({ description: "Board removed from favorites" });
+    } else {
+      starredIds.push(params.id);
+      toast({ description: "Board added to favorites" });
+    }
+
+    localStorage.setItem("starred_boards", JSON.stringify(starredIds));
+    setIsStarred(!isStarred);
+  };
+
+  const handleShareBoard = () => {
+    navigator.clipboard.writeText(window.location.href);
+    toast({
+      title: "Link copied",
+      description: "Board link copied to clipboard",
+    });
+  };
+
+  const handleDeleteBoard = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this board? This action cannot be undone.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await api.deleteBoard(parseInt(params.id));
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      toast({
+        title: "Success",
+        description: "Board deleted successfully",
+      });
+      router.push("/boards");
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete board",
+      });
+    }
+  };
+
+  const handleUpdateBoardTitle = async () => {
+    if (!newBoardTitle.trim() || newBoardTitle === boardTitle) {
+      setIsEditingBoard(false);
+      return;
+    }
+
+    try {
+      const response = await api.updateBoard(parseInt(params.id), {
+        name: newBoardTitle,
+      });
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      setBoardTitle(newBoardTitle);
+      setIsEditingBoard(false);
+      toast({
+        title: "Success",
+        description: "Board renamed successfully",
+      });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to rename board",
+      });
+    }
+  };
+
+  useEffect(() => {
     const initVoice = async () => {
       try {
         const response = await api.getAgoraToken(parseInt(params.id));
-        
+
         if (response.data) {
           const { token, appId, uid, channel } = response.data;
           setLocalUid(uid);
 
           client.removeAllListeners();
-          
+
           client.on("user-joined", (user) => {
-              setRemoteUsers(prev => {
-                  if (prev.includes(user.uid as number)) return prev;
-                  return [...prev, user.uid as number];
-              });
+            setRemoteUsers((prev) => {
+              if (prev.includes(user.uid as number)) return prev;
+              return [...prev, user.uid as number];
+            });
           });
 
           client.on("user-left", (user) => {
-              setRemoteUsers(prev => prev.filter(id => id !== user.uid));
+            setRemoteUsers((prev) => prev.filter((id) => id !== user.uid));
           });
 
           client.on("user-published", async (user, mediaType) => {
-              if (joinedRef.current) {
-                await client.subscribe(user, mediaType);
-                if (mediaType === "audio") {
-                    user.audioTrack?.play();
-                }
+            if (joinedRef.current) {
+              await client.subscribe(user, mediaType);
+              if (mediaType === "audio") {
+                user.audioTrack?.play();
               }
+            }
           });
 
           client.enableAudioVolumeIndicator();
           client.on("volume-indicator", (volumes) => {
-              const speaking = new Set<number>();
-              volumes.forEach(v => {
-                  if (v.level > 5) {
-                      speaking.add(v.uid as number);
-                  }
-              });
-              setSpeakingUsers(speaking);
+            const speaking = new Set<number>();
+            volumes.forEach((v) => {
+              if (v.level > 5) {
+                speaking.add(v.uid as number);
+              }
+            });
+            setSpeakingUsers(speaking);
           });
 
           await client.join(appId, channel, token, uid);
         }
       } catch (err) {
-        console.error('Error initializing voice:', err);
+        console.error("Error initializing voice:", err);
       }
     };
 
@@ -141,14 +273,14 @@ export default function BoardPage({ params }: BoardPageProps) {
     setIsConnecting(true);
     try {
       // Add a small delay for the animation to be appreciated
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+
       const track = await AgoraRTC.createMicrophoneAudioTrack();
       await client.publish([track]);
       setAudioTrack(track);
       setJoined(true);
       joinedRef.current = true;
-      
+
       // Subscribe to existing users
       client.remoteUsers.forEach(async (user) => {
         if (user.hasAudio) {
@@ -162,16 +294,16 @@ export default function BoardPage({ params }: BoardPageProps) {
         description: "Joined voice room successfully",
       });
     } catch (err) {
-      console.error('Error joining voice room:', err);
+      console.error("Error joining voice room:", err);
       toast({
         variant: "destructive",
-        title: "Error", 
+        title: "Error",
         description: "Failed to join voice room",
       });
     } finally {
       setIsConnecting(false);
     }
-  }
+  };
 
   const leave = async () => {
     try {
@@ -180,7 +312,7 @@ export default function BoardPage({ params }: BoardPageProps) {
         setAudioTrack(null);
       }
       await client.unpublish();
-      
+
       // Unsubscribe from all remote users
       client.remoteUsers.forEach(async (user) => {
         if (user.hasAudio) {
@@ -196,16 +328,16 @@ export default function BoardPage({ params }: BoardPageProps) {
         description: "Left voice room",
       });
     } catch (err) {
-      console.error('Error leaving voice room:', err);
+      console.error("Error leaving voice room:", err);
     }
-  }
+  };
 
   const toggleMute = async () => {
     if (audioTrack) {
       await audioTrack.setMuted(!isMuted);
       setIsMuted(!isMuted);
     }
-  }
+  };
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -233,29 +365,33 @@ export default function BoardPage({ params }: BoardPageProps) {
         setLoading(true);
         setError(null);
         const response = await api.getBoardWithLists(parseInt(params.id));
-        
+
         if (response.error) {
           throw new Error(response.error);
         }
 
         if (response.data?.board) {
           setLists(response.data.board.lists || []);
-          setBoardTitle(response.data.board.name || 'Untitled Board');
-          
+          setBoardTitle(response.data.board.name || "Untitled Board");
+          setNewBoardTitle(response.data.board.name || "Untitled Board");
+
           const owner: User = {
-              id: response.data.board.owner_id,
-              username: response.data.board.owner_username,
-              email: response.data.board.owner_email,
-              profile_image: response.data.board.owner_profile_image || "", 
+            id: response.data.board.owner_id,
+            username: response.data.board.owner_username,
+            email: response.data.board.owner_email,
+            profile_image: response.data.board.owner_profile_image || "",
           };
           const boardMembers = response.data.board.members || [];
-          const allMembers = [owner, ...boardMembers.filter(m => m.id !== owner.id)];
+          const allMembers = [
+            owner,
+            ...boardMembers.filter((m) => m.id !== owner.id),
+          ];
           setMembers(allMembers);
         }
       } catch (err) {
         toast({
-          description : 'Failed to load Board'
-        })
+          description: "Failed to load Board",
+        });
       } finally {
         setLoading(false);
       }
@@ -281,7 +417,7 @@ export default function BoardPage({ params }: BoardPageProps) {
     }
 
     const activeCardId = active.id;
-    
+
     let sourceList: ColumnType | undefined;
     let cardToMove: CardType | undefined;
 
@@ -300,9 +436,9 @@ export default function BoardPage({ params }: BoardPageProps) {
     }
 
     let targetList: ColumnType | undefined;
-    
+
     targetList = lists.find((list) => list.id === over.id);
-    
+
     if (!targetList) {
       for (const list of lists) {
         if (list.cards.some((c) => c.id === over.id)) {
@@ -338,24 +474,34 @@ export default function BoardPage({ params }: BoardPageProps) {
           if (list.id === targetList!.id) {
             return {
               ...list,
-              cards: [...list.cards, { ...cardToMove!, list_id: targetList!.id, position: newPosition }],
+              cards: [
+                ...list.cards,
+                {
+                  ...cardToMove!,
+                  list_id: targetList!.id,
+                  position: newPosition,
+                },
+              ],
             };
           }
           return list;
         });
       });
 
-      const response = await api.moveCard(Number(activeCardId), Number(targetList.id), newPosition);
-      
+      const response = await api.moveCard(
+        Number(activeCardId),
+        Number(targetList.id),
+        newPosition,
+      );
+
       if (response.error) {
         throw new Error(response.error);
       }
-
     } catch (err) {
-      console.error('Error moving card:', err);
+      console.error("Error moving card:", err);
       setLists(originalLists);
       toast({
-        description: 'Failed to move card',
+        description: "Failed to move card",
         variant: "destructive",
       });
     }
@@ -378,11 +524,16 @@ export default function BoardPage({ params }: BoardPageProps) {
 
     setIsCreatingCard(true);
     try {
-      const targetList = lists.find(list => list.id === createCardListId);
+      const targetList = lists.find((list) => list.id === createCardListId);
       const newPosition = targetList ? targetList.cards.length : 0;
-      
-      const response = await api.createCard(createCardListId, newCardTitle, newCardDescription, newPosition);
-      
+
+      const response = await api.createCard(
+        createCardListId,
+        newCardTitle,
+        newCardDescription,
+        newPosition,
+      );
+
       if (response.error) {
         throw new Error(response.error);
       }
@@ -398,27 +549,27 @@ export default function BoardPage({ params }: BoardPageProps) {
           assignees: response.data.card.assignees || [],
           due_date: response.data.card.due_date,
         };
-        
+
         setLists((prevLists) =>
           prevLists.map((list) =>
-            list.id === createCardListId 
-              ? { ...list, cards: [...list.cards, createdCard] } 
-              : list
-          )
+            list.id === createCardListId
+              ? { ...list, cards: [...list.cards, createdCard] }
+              : list,
+          ),
         );
-        
+
         setShowCreateCardModal(false);
         setNewCardTitle("");
         setNewCardDescription("");
         setCreateCardListId(null);
-        
+
         toast({
           title: "Success",
           description: "Card created successfully!",
         });
       }
     } catch (err) {
-      console.error('Error creating card:', err);
+      console.error("Error creating card:", err);
       toast({
         variant: "destructive",
         description: "Error creating card",
@@ -432,7 +583,7 @@ export default function BoardPage({ params }: BoardPageProps) {
   const handleUpdateCard = async (updatedCard: CardType) => {
     try {
       const response = await api.updateCard(updatedCard.id, updatedCard);
-      
+
       if (response.error) {
         throw new Error(response.error);
       }
@@ -449,8 +600,8 @@ export default function BoardPage({ params }: BoardPageProps) {
         );
       }
     } catch (err) {
-      console.error('Error updating card:', err);
-     toast({
+      console.error("Error updating card:", err);
+      toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to update card",
@@ -463,7 +614,7 @@ export default function BoardPage({ params }: BoardPageProps) {
 
     try {
       const response = await api.deleteCard(activeCard.id);
-      
+
       if (response.error) {
         throw new Error(response.error);
       }
@@ -476,7 +627,7 @@ export default function BoardPage({ params }: BoardPageProps) {
       );
       setActiveCard(null);
     } catch (err) {
-      console.error('Error deleting card:', err);
+      console.error("Error deleting card:", err);
       toast({
         variant: "destructive",
         title: "Error",
@@ -486,7 +637,8 @@ export default function BoardPage({ params }: BoardPageProps) {
   };
 
   const handleAddList = () => {
-    const nextPosition = lists.length > 0 ? Math.max(...lists.map(l => l.position)) + 1 : 0;
+    const nextPosition =
+      lists.length > 0 ? Math.max(...lists.map((l) => l.position)) + 1 : 0;
     setNewListPosition(nextPosition);
     setShowCreateListModal(true);
   };
@@ -498,104 +650,110 @@ export default function BoardPage({ params }: BoardPageProps) {
     setIsCreatingList(true);
     try {
       const response = await api.createList(parseInt(params.id), newListName);
-      
+
       if (response.error) {
         throw new Error(response.error);
       }
 
       if (response.data) {
         const newList = { ...response.data, cards: [] };
-        setLists(prev => [...prev, newList]);
+        setLists((prev) => [...prev, newList]);
         setShowCreateListModal(false);
         setNewListName("");
       }
     } catch (err) {
-      console.error('Error creating list:', err);
+      console.error("Error creating list:", err);
       toast({
-        description:'Failed to create list',
-        variant: "destructive", 
+        description: "Failed to create list",
+        variant: "destructive",
         title: "Error",
-      })
+      });
     } finally {
       setIsCreatingList(false);
     }
   };
 
   const handleEditList = (listId: number, currentName: string) => {
-    setEditingListId(listId)
-    setEditingListName(currentName)
-  }
+    setEditingListId(listId);
+    setEditingListName(currentName);
+  };
 
   const handleUpdateList = async (listId: number) => {
-    if (!editingListName.trim()) return
+    if (!editingListName.trim()) return;
 
     try {
-      const response = await api.updateList(listId, editingListName)
-      
+      const response = await api.updateList(listId, editingListName);
+
       if (response.error) {
-        throw new Error(response.error)
+        throw new Error(response.error);
       }
 
       setLists((prevLists) =>
         prevLists.map((list) =>
-          list.id === listId ? { ...list, name: editingListName } : list
-        )
-      )
+          list.id === listId ? { ...list, name: editingListName } : list,
+        ),
+      );
 
-      setEditingListId(null)
-      setEditingListName("")
+      setEditingListId(null);
+      setEditingListName("");
 
       toast({
         title: "Success",
         description: "List updated successfully",
-      })
+      });
     } catch (err) {
-      console.error('Error updating list:', err)
+      console.error("Error updating list:", err);
       toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to update list",
-      })
+      });
     }
-  }
+  };
 
-  const handleDeleteList = async (listId: number) => {
-    if (!confirm("Are you sure you want to delete this list? All cards in this list will be deleted.")) {
-      return
-    }
+  const handleDeleteList = (listId: number) => {
+    setListToDelete(listId);
+    setShowDeleteListDialog(true);
+  };
 
-    setIsDeletingList(listId)
+  const confirmDeleteList = async () => {
+    if (!listToDelete) return;
+
+    setIsDeletingList(listToDelete);
+    setShowDeleteListDialog(false);
+
     try {
-      const response = await api.deleteList(listId)
-      
+      const response = await api.deleteList(listToDelete);
+
       if (response.error) {
-        throw new Error(response.error)
+        throw new Error(response.error);
       }
 
-      setLists((prevLists) => prevLists.filter((list) => list.id !== listId))
+      setLists((prevLists) => prevLists.filter((list) => list.id !== listToDelete));
 
       toast({
         title: "Success",
         description: "List deleted successfully",
-      })
+      });
     } catch (err) {
-      console.error('Error deleting list:', err)
+      console.error("Error deleting list:", err);
       toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to delete list",
-      })
+      });
     } finally {
-      setIsDeletingList(null)
+      setIsDeletingList(null);
+      setListToDelete(null);
     }
-  }
+  };
 
   const handleAssignUser = async (cardId: number, userId: number) => {
     try {
-      const response = await api.assignUserToCard(cardId, userId)
-      
+      const response = await api.assignUserToCard(cardId, userId);
+
       if (response.error) {
-        throw new Error(response.error)
+        throw new Error(response.error);
       }
 
       setLists((prevLists) =>
@@ -607,30 +765,30 @@ export default function BoardPage({ params }: BoardPageProps) {
                   ...card,
                   assignees: response?.data?.assignees || [],
                 }
-              : card
+              : card,
           ),
-        }))
-      )
+        })),
+      );
 
       toast({
         title: "Success",
         description: "User assigned to card",
-      })
+      });
     } catch (err) {
       toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to assign user",
-      })
+      });
     }
-  }
+  };
 
   const handleUnassignUser = async (cardId: number, userId: number) => {
     try {
-      const response = await api.unassignUserFromCard(cardId, userId)
-      
+      const response = await api.unassignUserFromCard(cardId, userId);
+
       if (response.error) {
-        throw new Error(response.error)
+        throw new Error(response.error);
       }
       setLists((prevLists) =>
         prevLists.map((list) => ({
@@ -639,108 +797,135 @@ export default function BoardPage({ params }: BoardPageProps) {
             card.id === cardId
               ? {
                   ...card,
-                  assignees: (card.assignees || []).filter((a) => a.id !== userId),
+                  assignees: (card.assignees || []).filter(
+                    (a) => a.id !== userId,
+                  ),
                 }
-              : card
+              : card,
           ),
-        }))
-      )
+        })),
+      );
 
       toast({
         title: "Success",
         description: "User unassigned from card",
-      })
+      });
     } catch (err) {
-      console.error("Error unassigning user:", err)
+      console.error("Error unassigning user:", err);
       toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to unassign user",
-      })
+      });
     }
-  }
+  };
 
-  const startCardRecording = async () => {
+  const startCardRecording = async (target: 'title' | 'description') => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRefCard.current = mediaRecorder
-      audioChunksRefCard.current = []
+      setRecordingTarget(target);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRefCard.current = mediaRecorder;
+      audioChunksRefCard.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          audioChunksRefCard.current.push(event.data)
+          audioChunksRefCard.current.push(event.data);
         }
-      }
+      };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRefCard.current, { type: 'audio/wav' })
-        await transcribeCardAudio(audioBlob)
-        
-        stream.getTracks().forEach(track => track.stop())
-      }
+        const audioBlob = new Blob(audioChunksRefCard.current, {
+          type: "audio/wav",
+        });
+        await transcribeCardAudio(audioBlob, target);
 
-      mediaRecorder.start()
-      setIsRecordingCard(true)
-      
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecordingCard(true);
+      setRecordingTimeCard(0);
+
+      // Start timer
+      recordingIntervalRefCard.current = setInterval(() => {
+        setRecordingTimeCard((prev) => prev + 1);
+      }, 1000);
+
       toast({
         title: "Recording Started",
-        description: "Describe your new card",
-      })
+        description: `Speak now to add your ${target}`,
+      });
     } catch (err) {
-      console.error('Error starting recording:', err)
+      console.error("Error starting recording:", err);
       toast({
         variant: "destructive",
         title: "Error",
         description: "Could not access microphone",
-      })
+      });
+      setRecordingTarget(null);
     }
-  }
+  };
 
   const stopCardRecording = () => {
-    if (mediaRecorderRefCard.current && mediaRecorderRefCard.current.state === 'recording') {
-      mediaRecorderRefCard.current.stop()
-      setIsRecordingCard(false)
+    if (
+      mediaRecorderRefCard.current &&
+      mediaRecorderRefCard.current.state === "recording"
+    ) {
+      mediaRecorderRefCard.current.stop();
+      setIsRecordingCard(false);
+
+      if (recordingIntervalRefCard.current) {
+        clearInterval(recordingIntervalRefCard.current);
+        recordingIntervalRefCard.current = null;
+      }
     }
-  }
+  };
 
-  const transcribeCardAudio = async (audioBlob: Blob) => {
-    setIsTranscribingCard(true)
-    
+  const transcribeCardAudio = async (audioBlob: Blob, target: 'title' | 'description') => {
+    setIsTranscribingCard(true);
+
     try {
-      const formData = new FormData()
-      formData.append('audio', audioBlob, 'card-recording.wav')
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "card-recording.wav");
 
-      const response = await fetch('http://localhost:8080/api/speech-to-text', {
-        method: 'POST',
+      const response = await fetch("http://localhost:8080/api/ai/stt", {
+        method: "POST",
         body: formData,
-      })
+      });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json()
-      
+      const data = await response.json();
+
       if (data.text) {
-        setNewCardTitle(data.text)
-        
+        if (target === 'title') {
+          setNewCardTitle(data.text);
+        } else {
+          setNewCardDescription((prev) =>
+            prev ? `${prev} ${data.text}` : data.text,
+          );
+        }
+
         toast({
           title: "Voice Input Complete",
-          description: "Card title set from voice",
-        })
+          description: `Card ${target} set from voice`,
+        });
       }
     } catch (err) {
-      console.error('Error transcribing audio:', err)
+      console.error("Error transcribing audio:", err);
       toast({
         variant: "destructive",
         title: "Transcription Failed",
         description: "Could not convert speech to text",
-      })
+      });
     } finally {
-      setIsTranscribingCard(false)
+      setIsTranscribingCard(false);
+      setRecordingTarget(null);
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -758,9 +943,7 @@ export default function BoardPage({ params }: BoardPageProps) {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-500 mb-4">{error}</p>
-          <Button onClick={() => window.location.reload()}>
-            Try Again
-          </Button>
+          <Button onClick={() => window.location.reload()}>Try Again</Button>
         </div>
       </div>
     );
@@ -769,7 +952,7 @@ export default function BoardPage({ params }: BoardPageProps) {
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-background to-background/95 overflow-hidden">
       {/* Header */}
-      <header className="border-b border-border/50 backdrop-blur-md z-50 bg-background/80 shadow-sm flex-shrink-0">
+      <header className="sticky top-0 left-0 z-50 w-full border-b border-border/50 backdrop-blur-md bg-background/80 shadow-sm flex-shrink-0">
         <div className="mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -781,8 +964,48 @@ export default function BoardPage({ params }: BoardPageProps) {
                 <ArrowLeft className="w-5 h-5" />
               </Link>
               <div className="flex items-center gap-3">
-               <div>
-                  <h1 className="text-xl font-bold">{boardTitle}</h1>
+                <div>
+                  {isEditingBoard ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={newBoardTitle}
+                        onChange={(e) => setNewBoardTitle(e.target.value)}
+                        className="h-8 w-48 font-bold"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleUpdateBoardTitle();
+                          if (e.key === "Escape") setIsEditingBoard(false);
+                        }}
+                      />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={handleUpdateBoardTitle}
+                      >
+                        <Check className="w-4 h-4 text-green-600" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => setIsEditingBoard(false)}
+                      >
+                        <X className="w-4 h-4 text-red-600" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <h1
+                      className="text-xl font-bold cursor-pointer hover:bg-accent/50 px-2 py-1 rounded transition-colors"
+                      onClick={() => {
+                        setNewBoardTitle(boardTitle);
+                        setIsEditingBoard(true);
+                      }}
+                      title="Click to rename"
+                    >
+                      {boardTitle}
+                    </h1>
+                  )}
                 </div>
               </div>
             </div>
@@ -790,39 +1013,50 @@ export default function BoardPage({ params }: BoardPageProps) {
             <div className="flex items-center gap-2 pr-6">
               {/* Participants Display - Always Visible */}
               {(remoteUsers.length > 0 || (joined && localUid)) && (
-              <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-background/50 backdrop-blur-sm border border-border/50 shadow-sm mr-2">
-                <div className="flex -space-x-2">
-                  {/* Local User - Only show if joined */}
-                  {joined && localUid && (
-                      <div className={`relative rounded-full transition-all duration-300 ${speakingUsers.has(localUid) ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-background scale-110 z-10 shadow-lg shadow-green-500/20' : ''}`}>
-                          <Avatar className="w-8 h-8 border-2 border-background">
-                              <AvatarImage src={currentUser?.profile_image} />
-                              <AvatarFallback className="bg-primary/10 text-primary text-xs">ME</AvatarFallback>
-                          </Avatar>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-background/50 backdrop-blur-sm border border-border/50 shadow-sm mr-2">
+                  <div className="flex -space-x-2">
+                    {/* Local User - Only show if joined */}
+                    {joined && localUid && (
+                      <div
+                        className={`relative rounded-full transition-all duration-300 ${speakingUsers.has(localUid) ? "ring-2 ring-green-500 ring-offset-2 ring-offset-background scale-110 z-10 shadow-lg shadow-green-500/20" : ""}`}
+                      >
+                        <Avatar className="w-8 h-8 border-2 border-background">
+                          <AvatarImage src={currentUser?.profile_image} />
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                            ME
+                          </AvatarFallback>
+                        </Avatar>
                       </div>
-                  )}
-                  {/* Remote Users - Always show */}
-                  {remoteUsers.map(uid => {
-                      const user = members.find(m => m.id === uid);
+                    )}
+                    {/* Remote Users - Always show */}
+                    {remoteUsers.map((uid) => {
+                      const user = members.find((m) => m.id === uid);
                       return (
-                          <div key={uid} className={`relative rounded-full transition-all duration-300 ${speakingUsers.has(uid) ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-background scale-110 z-10 shadow-lg shadow-green-500/20' : ''}`}>
-                              <Avatar className="w-8 h-8 border-2 border-background" title={user?.username || 'Unknown'}>
-                                  <AvatarImage src={user?.profile_image} />
-                                  <AvatarFallback className="bg-muted text-muted-foreground text-xs">
-                                      {user?.username?.substring(0, 2).toUpperCase() || '??'}
-                                  </AvatarFallback>
-                              </Avatar>
-                          </div>
+                        <div
+                          key={uid}
+                          className={`relative rounded-full transition-all duration-300 ${speakingUsers.has(uid) ? "ring-2 ring-green-500 ring-offset-2 ring-offset-background scale-110 z-10 shadow-lg shadow-green-500/20" : ""}`}
+                        >
+                          <Avatar
+                            className="w-8 h-8 border-2 border-background"
+                            title={user?.username || "Unknown"}
+                          >
+                            <AvatarImage src={user?.profile_image} />
+                            <AvatarFallback className="bg-muted text-muted-foreground text-xs">
+                              {user?.username?.substring(0, 2).toUpperCase() ||
+                                "??"}
+                            </AvatarFallback>
+                          </Avatar>
+                        </div>
                       );
-                  })}
+                    })}
+                  </div>
                 </div>
-              </div>
               )}
 
               {/* Voice Room Button */}
               {!joined ? (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   onClick={join}
                   className="gap-2 hover:bg-accent/50 transition-all duration-200 border border-transparent hover:border-border/30"
@@ -849,67 +1083,118 @@ export default function BoardPage({ params }: BoardPageProps) {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                     </span>
-                    <span className="text-xs font-medium text-green-600 dark:text-green-400 hidden sm:inline-block">Voice Active</span>
+                    <span className="text-xs font-medium text-green-600 dark:text-green-400 hidden sm:inline-block">
+                      Voice Active
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-1">
-                    <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={toggleMute}
-                        className={`h-8 w-8 p-0 rounded-full transition-all duration-200 ${
-                        isMuted 
-                            ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400' 
-                            : 'bg-background/50 hover:bg-background text-foreground shadow-sm'
-                        }`}
-                        title={isMuted ? "Unmute" : "Mute"}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleMute}
+                      className={`h-8 w-8 p-0 rounded-full transition-all duration-200 ${
+                        isMuted
+                          ? "bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
+                          : "bg-background/50 hover:bg-background text-foreground shadow-sm"
+                      }`}
+                      title={isMuted ? "Unmute" : "Mute"}
                     >
-                        {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                      {isMuted ? (
+                        <MicOff className="w-4 h-4" />
+                      ) : (
+                        <Mic className="w-4 h-4" />
+                      )}
                     </Button>
-                    
-                    <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={leave}
-                        className="h-8 w-8 p-0 rounded-full text-muted-foreground hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-200"
-                        title="Leave Voice"
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={leave}
+                      className="h-8 w-8 p-0 rounded-full text-muted-foreground hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-200"
+                      title="Leave Voice"
                     >
-                        <PhoneOff className="w-4 h-4" />
+                      <PhoneOff className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
               )}
 
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
-                className="gap-2 hover:bg-primary/10 hover:text-primary transition-colors"
+                className={`gap-2 hover:bg-primary/10 hover:text-primary transition-colors ${isStarred ? "text-yellow-500 hover:text-yellow-600" : ""}`}
+                onClick={toggleStar}
               >
-                <Star className="w-4 h-4" />
-                <span className="hidden sm:inline">Star</span>
+                <Star
+                  className={`w-4 h-4 ${isStarred ? "fill-current" : ""}`}
+                />
+                <span className="hidden sm:inline">
+                  {isStarred ? "Starred" : "Star"}
+                </span>
               </Button>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 className="gap-2 hover:bg-primary/10 hover:text-primary transition-colors"
+                onClick={handleShareBoard}
               >
                 <Users className="w-4 h-4" />
                 <span className="hidden sm:inline">Share</span>
               </Button>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                className="hover:bg-accent"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </Button>
+
+              <Link href={`/board/${params.id}/analytics`}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-2 hover:bg-primary/10 hover:text-primary transition-colors"
+                >
+                  <BarChart2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Analytics</span>
+                </Button>
+              </Link>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hover:bg-accent"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setNewBoardTitle(boardTitle);
+                      setIsEditingBoard(true);
+                    }}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit Board
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleShareBoard}>
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Share Board
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleDeleteBoard}
+                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Board
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
-          
+
           {error && (
             <div className="mt-3 bg-destructive/10 border border-destructive/30 text-destructive px-4 py-2 rounded-lg flex items-center justify-between animate-fade-in">
               <span className="text-sm">{error}</span>
-              <button 
+              <button
                 onClick={() => setError(null)}
                 className="ml-2 text-destructive hover:text-destructive/80 font-bold transition-colors"
               >
@@ -935,7 +1220,7 @@ export default function BoardPage({ params }: BoardPageProps) {
                   list={list}
                   onAddCard={handleAddCard}
                   onCardClick={(card) => {
-                    router.push(`/board/${params.id}/card/${card.id}`)
+                    router.push(`/board/${params.id}/card/${card.id}`);
                   }}
                   onAssignUser={handleAssignUser}
                   onUnassignUser={handleUnassignUser}
@@ -944,8 +1229,8 @@ export default function BoardPage({ params }: BoardPageProps) {
                   onEditTitle={(name) => setEditingListName(name)}
                   onSaveTitle={() => handleUpdateList(list.id)}
                   onCancelEdit={() => {
-                    setEditingListId(null)
-                    setEditingListName("")
+                    setEditingListId(null);
+                    setEditingListName("");
                   }}
                   onEdit={() => handleEditList(list.id, list.name)}
                   onDelete={() => handleDeleteList(list.id)}
@@ -956,7 +1241,7 @@ export default function BoardPage({ params }: BoardPageProps) {
 
             {/* Add List Button */}
             <div className="flex-shrink-0 w-80">
-              <button 
+              <button
                 onClick={handleAddList}
                 className="w-full border border-dashed border-border rounded-lg p-4 bg-card/30 hover:bg-card/50 hover:border-primary/50 transition-all duration-300 flex items-center justify-center gap-2 group"
               >
@@ -988,7 +1273,7 @@ export default function BoardPage({ params }: BoardPageProps) {
             setNewCardDescription("");
             setCreateCardListId(null);
           }}
-          style={{ position: 'fixed' }}
+          style={{ position: "fixed" }}
         >
           <div
             className="w-full max-w-md border border-border rounded-xl p-8 bg-card"
@@ -1007,10 +1292,12 @@ export default function BoardPage({ params }: BoardPageProps) {
                     onChange={(e) => setNewCardTitle(e.target.value)}
                     required
                     className="bg-background border-border pr-12"
-                    disabled={isCreatingCard || isRecordingCard || isTranscribingCard}
+                    disabled={
+                      isCreatingCard || isRecordingCard || isTranscribingCard
+                    }
                     autoFocus
                   />
-                  
+
                   {/* Voice Input Button for Card Title */}
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                     {!isRecordingCard && !isTranscribingCard ? (
@@ -1018,59 +1305,110 @@ export default function BoardPage({ params }: BoardPageProps) {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={startCardRecording}
+                        onClick={() => startCardRecording('title')}
                         className="h-6 w-6 p-0 hover:bg-primary/10"
                         title="Voice input"
                       >
                         <Mic className="w-3 h-3" />
                       </Button>
-                    ) : isRecordingCard ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={stopCardRecording}
-                        className="h-6 w-6 p-0 text-red-600 animate-pulse"
-                        title="Stop recording"
-                      >
-                        <Square className="w-3 h-3 fill-current" />
-                      </Button>
-                    ) : (
-                      <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
-                    )}
+                    ) : (isRecordingCard || isTranscribingCard) && recordingTarget === 'title' ? (
+                       isRecordingCard ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={stopCardRecording}
+                          className="h-6 w-6 p-0 text-red-600 animate-pulse"
+                          title="Stop recording"
+                        >
+                          <Square className="w-3 h-3 fill-current" />
+                        </Button>
+                      ) : (
+                        <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                      )
+                    ) : null}
                   </div>
                 </div>
-                
-                {isRecordingCard && (
+
+                {isRecordingCard && recordingTarget === 'title' && (
                   <p className="text-xs text-red-600 mt-1 animate-fade-in">
                     🔴 Recording... Speak the card title
                   </p>
                 )}
-                
-                {isTranscribingCard && (
+
+                {isTranscribingCard && recordingTarget === 'title' && (
                   <p className="text-xs text-primary mt-1 animate-fade-in">
                     Processing voice input...
                   </p>
                 )}
               </div>
-              
+
               <div>
                 <label className="text-sm font-medium mb-2 block">
                   Description (optional)
                 </label>
-                <textarea
-                  placeholder="Add more details about this card..."
-                  value={newCardDescription}
-                  onChange={(e) => setNewCardDescription(e.target.value)}
-                  className="w-full min-h-[100px] px-3 py-2 rounded-md border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                  disabled={isCreatingCard}
-                />
+                <div className="relative">
+                  <textarea
+                    placeholder="Add more details about this card..."
+                    value={newCardDescription}
+                    onChange={(e) => setNewCardDescription(e.target.value)}
+                    className="w-full min-h-[100px] px-3 py-2 rounded-md border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary pr-10"
+                    disabled={isCreatingCard || isRecordingCard || isTranscribingCard}
+                  />
+                   {/* Voice Input Button for Card Description */}
+                   <div className="absolute right-3 top-3">
+                    {!isRecordingCard && !isTranscribingCard ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => startCardRecording('description')}
+                        className="h-6 w-6 p-0 hover:bg-primary/10"
+                        title="Voice input"
+                      >
+                        <Mic className="w-3 h-3" />
+                      </Button>
+                    ) : (isRecordingCard || isTranscribingCard) && recordingTarget === 'description' ? (
+                       isRecordingCard ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={stopCardRecording}
+                          className="h-6 w-6 p-0 text-red-600 animate-pulse"
+                          title="Stop recording"
+                        >
+                          <Square className="w-3 h-3 fill-current" />
+                        </Button>
+                      ) : (
+                        <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                      )
+                    ) : null}
+                  </div>
+                </div>
+
+                {isRecordingCard && recordingTarget === 'description' && (
+                  <p className="text-xs text-red-600 mt-1 animate-fade-in">
+                    🔴 Recording... Speak the card description
+                  </p>
+                )}
+
+                {isTranscribingCard && recordingTarget === 'description' && (
+                  <p className="text-xs text-primary mt-1 animate-fade-in">
+                    Processing voice input...
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-3 pt-4">
                 <Button
                   type="submit"
                   className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                  disabled={isCreatingCard || !newCardTitle.trim() || isRecordingCard || isTranscribingCard}
+                  disabled={
+                    isCreatingCard ||
+                    !newCardTitle.trim() ||
+                    isRecordingCard ||
+                    isTranscribingCard
+                  }
                 >
                   {isCreatingCard ? (
                     <div className="flex items-center gap-2">
@@ -1090,7 +1428,9 @@ export default function BoardPage({ params }: BoardPageProps) {
                     setNewCardDescription("");
                     setCreateCardListId(null);
                   }}
-                  disabled={isCreatingCard || isRecordingCard || isTranscribingCard}
+                  disabled={
+                    isCreatingCard || isRecordingCard || isTranscribingCard
+                  }
                 >
                   Cancel
                 </Button>
@@ -1103,7 +1443,7 @@ export default function BoardPage({ params }: BoardPageProps) {
       {/* Create List Modal */}
       {showCreateListModal && (
         <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fade-in"
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 "
           onClick={() => setShowCreateListModal(false)}
         >
           <div
@@ -1133,13 +1473,16 @@ export default function BoardPage({ params }: BoardPageProps) {
                 <Input
                   type="number"
                   value={newListPosition}
-                  onChange={(e) => setNewListPosition(parseInt(e.target.value) || 0)}
+                  onChange={(e) =>
+                    setNewListPosition(parseInt(e.target.value) || 0)
+                  }
                   min="0"
                   className="bg-background border-border"
                   disabled={isCreatingList}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Position determines the order of lists (lower numbers appear first)
+                  Position determines the order of lists (lower numbers appear
+                  first)
                 </p>
               </div>
               <div className="flex items-center gap-3 pt-4">
@@ -1174,7 +1517,27 @@ export default function BoardPage({ params }: BoardPageProps) {
         </div>
       )}
 
-
+      {/* Delete List Confirmation Dialog */}
+      <AlertDialog open={showDeleteListDialog} onOpenChange={setShowDeleteListDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the list and all its cards.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteList}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

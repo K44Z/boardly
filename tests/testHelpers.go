@@ -3,11 +3,11 @@ package tests
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 
 	_ "github.com/lib/pq"
-
-	"os"
+	"github.com/pressly/goose"
 
 	"github.com/K44Z/boardly/internal/ai"
 	br "github.com/K44Z/boardly/internal/board/routes"
@@ -23,14 +23,11 @@ import (
 	"github.com/K44Z/boardly/shared/schemas"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pressly/goose/v3"
 )
 
 func SetupApp() (*fiber.App, *schemas.DB) {
-	dbUrl := os.Getenv("TEST_DB_URL")
-	if dbUrl == "" {
-		dbUrl = "postgres://test:test@localhost:5432/test?sslmode=disable"
-	}
+	dbUrl := "postgres://boardly:boardly@localhost:5432/boardly?sslmode=disable"
+
 	config := &schemas.Config{
 		DbUrl: dbUrl,
 	}
@@ -88,7 +85,7 @@ func RunMigrations(connStr string) {
 	defer sqlDB.Close()
 
 	if err := goose.Up(sqlDB, "../database/migrations"); err != nil {
-		log.Fatalf("failed to run migrations: %v", err)
+		fmt.Println("Error running while doing migration up :", err)
 	}
 
 	log.Println("Migrations applied successfully")

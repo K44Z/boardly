@@ -29,6 +29,42 @@ export interface UpdateBoardRequest {
 // Re-export types from board.ts for convenience
 export type { User, Board, List, Card, BoardWithLists, Label };
 
+export interface BoardStats {
+  total_lists: number;
+  total_cards: number;
+  total_members: number;
+  total_labels: number;
+  total_comments: number;
+  overdue_cards: number;
+  due_soon_cards: number;
+}
+
+export interface BoardActivity {
+  date: string;
+  cards_created: number;
+  comments_made: number;
+}
+
+export interface CardsPerList {
+  list_id: number;
+  list_name: string;
+  card_count: number;
+}
+
+export interface CardsPerMember {
+  user_id: number;
+  username: string;
+  profile_image: string;
+  card_count: number;
+}
+
+export interface BoardAnalytics {
+  stats: BoardStats;
+  activity: BoardActivity[];
+  cards_per_list: CardsPerList[];
+  cards_per_member: CardsPerMember[];
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -305,6 +341,10 @@ class ApiClient {
       method: "POST",
       body: formData,
     });
+  }
+
+  async getBoardAnalytics(boardId: number): Promise<ApiResponse<BoardAnalytics>> {
+    return this.request<BoardAnalytics>(`/analytics/board/${boardId}`);
   }
 }
 

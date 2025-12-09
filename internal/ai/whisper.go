@@ -27,30 +27,30 @@ type WhisperResponse struct {
 func (h *AiHandler) STTHandler(c *fiber.Ctx) error {
 	file, err := c.FormFile("audio")
 	if err != nil {
-		utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
+		return utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
 	}
 
 	src, err := file.Open()
 	if err != nil {
-		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
+		return utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
 	}
 	defer src.Close()
 
 	audioData, err := io.ReadAll(src)
 	if err != nil {
-		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
+		return utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
 	}
 
 	aiService := &AiService{}
 
 	transcription, err := aiService.STT(audioData, file.Filename)
 	if err != nil {
-		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
+		return utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
 	}
 
 	var whisperResp WhisperResponse
 	if err := json.Unmarshal(transcription, &whisperResp); err != nil {
-		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
+		return utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
 	}
 
 	return c.JSON(SttResponse{

@@ -151,16 +151,16 @@ func (h *BoardHandler) DeleteBoardHandler(c *fiber.Ctx) error {
 func (h *BoardHandler) GetFullBoardHandler(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	if idStr == "" {
-		utils.SendError(c, fiber.StatusBadRequest, "id cannot be empty", errors.New("id cannot be empty"))
+		return utils.SendError(c, fiber.StatusBadRequest, "id cannot be empty", errors.New("id cannot be empty"))
 	}
 	idInt, err := strconv.Atoi(idStr)
 	if err != nil {
-		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
+		return utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
 	}
 	id := int32(idInt)
 	board, err := h.service.GetFullBoard(c.Context(), &id)
 	if err != nil {
-		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
+		return utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
 	}
 	return c.Status(200).JSON(fiber.Map{
 		"board": board,

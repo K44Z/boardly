@@ -237,6 +237,7 @@ export default function BoardsPage() {
 
   // Generate avatar colors based on username
   const getAvatarColor = (name: string) => {
+    if (!name) return 'bg-gray-500';
     const colors = [
       'bg-blue-500',
       'bg-green-500',
@@ -251,49 +252,9 @@ export default function BoardsPage() {
     return colors[index];
   };
 
-  const getMockMembers = (boardId: number, ownerUsername?: string) => {
-    const memberNames = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank'];
-    const count = Math.floor(Math.random() * 5) + 1; // 1-5 members
-    const members = [];
-    
-    if (ownerUsername) {
-      members.push({ name: ownerUsername, isOwner: true });
-    }
-    
-    for (let i = 0; i < count && i < memberNames.length; i++) {
-      if (memberNames[i] !== ownerUsername) {
-        members.push({ name: memberNames[i], isOwner: false });
-      }
-    }
-    
-    return members;
-  };
-
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-black x-org-glow-bg">
-      <header className="border-b border-border/50 backdrop-blur-sm sticky top-0 z-50 bg-transparent">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold">Boardly</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={logout}>
-              Logout
-            </Button>
-            <Link href="/profile">
-              <Avatar className="w-8 h-8 cursor-pointer hover:opacity-80 transition-opacity border border-border">
-                <AvatarImage src={currentUser?.profile_image} />
-                <AvatarFallback className="bg-primary/20 text-primary text-xs font-semibold">
-                  {currentUser?.username ? currentUser.username.substring(0, 2).toUpperCase() : "ME"}
-                </AvatarFallback>
-              </Avatar>
-            </Link>
-          </div>
-        </div>
-      </header>
-
+      <div className="min-h-screen bg-background">
       <div className="container mx-auto px-6 py-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 animate-fade-in">
           <div>
@@ -414,26 +375,30 @@ export default function BoardsPage() {
                       {/* Member Avatars */}
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex -space-x-2">
-                          {getMockMembers(board.id, board.owner_username).slice(0, 3).map((member, idx) => (
+                          {(board.members || []).slice(0, 3).map((member, idx) => (
                             <div
                               key={idx}
-                              className={`w-8 h-8 rounded-full ${getAvatarColor(member.name)} border-2 border-card flex items-center justify-center text-xs font-semibold text-white shadow-sm`}
-                              title={member.name}
+                              className={`w-8 h-8 rounded-full ${getAvatarColor(member.username)} border-2 border-card flex items-center justify-center text-xs font-semibold text-white shadow-sm overflow-hidden`}
+                              title={member.username}
                             >
-                              {member.name.charAt(0).toUpperCase()}
+                              {member.profile_image ? (
+                                <img src={member.profile_image} alt={member.username} className="w-full h-full object-cover" />
+                              ) : (
+                                member.username.charAt(0).toUpperCase()
+                              )}
                             </div>
                           ))}
-                          {getMockMembers(board.id, board.owner_username).length > 3 && (
+                          {(board.members || []).length > 3 && (
                             <div
                               className="w-8 h-8 rounded-full bg-muted border-2 border-card flex items-center justify-center text-xs font-semibold text-muted-foreground shadow-sm"
-                              title={`${getMockMembers(board.id, board.owner_username).length - 3} more`}
+                              title={`${(board.members || []).length - 3} more`}
                             >
-                              +{getMockMembers(board.id, board.owner_username).length - 3}
+                              +{(board.members || []).length - 3}
                             </div>
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {getMockMembers(board.id, board.owner_username).length} {getMockMembers(board.id, board.owner_username).length === 1 ? 'member' : 'members'}
+                          {(board.members || []).length} {(board.members || []).length === 1 ? 'member' : 'members'}
                         </div>
                       </div>
                       

@@ -2,6 +2,7 @@ package main
 
 import (
 	ai "github.com/K44Z/boardly/internal/ai"
+	an "github.com/K44Z/boardly/internal/analytics/routes"
 	br "github.com/K44Z/boardly/internal/board/routes"
 	ca "github.com/K44Z/boardly/internal/card/routes"
 	la "github.com/K44Z/boardly/internal/label/routes"
@@ -18,4 +19,5 @@ func SetupRoutes(app *fiber.App, services *Services, db *schemas.DB) {
 	li.NewListRouter(app, &services.ListService)
 	ca.NewCardRouter(app, &services.CardService)
 	ai.NewAiRouter(app, &services.AIService)
+	an.RegisterAnalyticsRoutes(app, services.AnalyticsService)
 }

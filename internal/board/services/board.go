@@ -57,11 +57,16 @@ func (s *boardService) ListBoardsByUser(ctx context.Context, userId *int32) ([]s
 		return nil, err
 	}
 
-	// Get member count for each board
+	// Get member count and members for each board
 	for i := range boards {
 		count, err := s.boardRepo.CountBoardMembers(ctx, &boards[i].ID)
 		if err == nil {
 			boards[i].MemberCount = count
+		}
+
+		members, err := s.boardRepo.GetBoardMembers(ctx, &boards[i].ID)
+		if err == nil {
+			boards[i].Members = members
 		}
 	}
 

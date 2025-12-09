@@ -99,7 +99,7 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-black x-org-glow-bg">
+      <div className="min-h-screen bg-background">
         <header className="border-b border-border/50 backdrop-blur-sm sticky top-0 z-50 bg-transparent">
           <div className="container mx-auto px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2">

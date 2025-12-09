@@ -96,6 +96,90 @@ func (q *Queries) GetBoardStats(ctx context.Context, id int32) (GetBoardStatsRow
 	return i, err
 }
 
+const getCardsPerList = `-- name: GetCardsPerList :many
+SELECT 
+    l.id,
+    l.name,
+    COUNT(c.id) as card_count
+FROM lists l
+LEFT JOIN cards c ON l.id = c.list_id
+WHERE l.board_id = $1
+GROUP BY l.id, l.name
+`
+
+type GetCardsPerListRow struct {
+	ID        int32
+	Name      string
+	CardCount int64
+}
+
+func (q *Queries) GetCardsPerList(ctx context.Context, boardID pgtype.Int4) ([]GetCardsPerListRow, error) {
+	rows, err := q.db.Query(ctx, getCardsPerList, boardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetCardsPerListRow
+	for rows.Next() {
+		var i GetCardsPerListRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.CardCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCardsPerMember = `-- name: GetCardsPerMember :many
+SELECT 
+    u.id,
+    u.username,
+    u.profile_image,
+    COUNT(DISTINCT CASE WHEN l.board_id = $1 THEN c.id END) as card_count
+FROM users u
+JOIN memberships m ON u.id = m.user_id
+LEFT JOIN assignments a ON u.id = a.user_id
+LEFT JOIN cards c ON a.card_id = c.id
+LEFT JOIN lists l ON c.list_id = l.id
+WHERE m.board_id = $1
+GROUP BY u.id, u.username, u.profile_image
+`
+
+type GetCardsPerMemberRow struct {
+	ID           int32
+	Username     string
+	ProfileImage string
+	CardCount    int64
+}
+
+func (q *Queries) GetCardsPerMember(ctx context.Context, boardID pgtype.Int4) ([]GetCardsPerMemberRow, error) {
+	rows, err := q.db.Query(ctx, getCardsPerMember, boardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetCardsPerMemberRow
+	for rows.Next() {
+		var i GetCardsPerMemberRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.ProfileImage,
+			&i.CardCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getDashboardOverview = `-- name: GetDashboardOverview :one
 SELECT 
     (SELECT COUNT(*) FROM boards WHERE owner_id = $1) as owned_boards,

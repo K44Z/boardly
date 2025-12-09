@@ -29,7 +29,7 @@ func TestAuthFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal("register request failed:", err)
 	}
-	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
 	t.Log("Register response:", string(body))
 

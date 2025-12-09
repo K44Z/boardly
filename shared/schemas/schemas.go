@@ -30,6 +30,7 @@ type BoardWithOwner struct {
 	CreatedAt     time.Time `json:"created_at"`
 	OwnerUsername string    `json:"owner_username"`
 	MemberCount   int64     `json:"member_count,omitempty"`
+	Members       []User    `json:"members,omitempty"`
 }
 
 type List struct {

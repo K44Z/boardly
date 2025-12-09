@@ -238,3 +238,26 @@ WHERE (b.owner_id = $2 OR EXISTS (
 )) AND cm.text ILIKE '%' || $1 || '%'
 
 ORDER BY board_name, content_type;
+-- name: GetCardsPerList :many
+SELECT 
+    l.id,
+    l.name,
+    COUNT(c.id) as card_count
+FROM lists l
+LEFT JOIN cards c ON l.id = c.list_id
+WHERE l.board_id = $1
+GROUP BY l.id, l.name;
+
+-- name: GetCardsPerMember :many
+SELECT 
+    u.id,
+    u.username,
+    u.profile_image,
+    COUNT(DISTINCT CASE WHEN l.board_id = $1 THEN c.id END) as card_count
+FROM users u
+JOIN memberships m ON u.id = m.user_id
+LEFT JOIN assignments a ON u.id = a.user_id
+LEFT JOIN cards c ON a.card_id = c.id
+LEFT JOIN lists l ON c.list_id = l.id
+WHERE m.board_id = $1
+GROUP BY u.id, u.username, u.profile_image;

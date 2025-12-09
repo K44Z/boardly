@@ -47,11 +47,11 @@ func (a *AiService) PromptOllama(model, prompt string) (*OllamaResponse, error) 
 func (h *AiHandler) PromptHandler(c *fiber.Ctx) error {
 	req := &OllamaRequest{}
 	if err := c.BodyParser(req); err != nil {
-		utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
+		return utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
 	}
 	res, err := h.service.PromptOllama(req.Model, req.Prompt)
 	if err != nil {
-		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
+		return utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
 	}
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"response": res,

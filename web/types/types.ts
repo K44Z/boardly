@@ -14,6 +14,7 @@ export interface Board {
   created_at: string;
   owner_username?: string;
   member_count?: number;
+  members?: User[];
 }
 
 export interface Label {

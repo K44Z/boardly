@@ -46,23 +46,20 @@ func (h *UserHandler) Login(c *fiber.Ctx) error {
 	if err := c.BodyParser(req); err != nil {
 		utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
 	}
-	fmt.Println(req)
 	user, err := h.service.CheckUser(c.Context(), &req.Email)
 	if err != nil {
-		utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
+		return utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
 	}
-	fmt.Println(user.Password, req.Password)
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
+		return utils.SendError(c, fiber.StatusBadRequest, fiber.ErrBadRequest.Error(), err)
 	}
 	token, err := utils.GenerateJWTtoken(&schemas.User{
 		Username: user.Username,
 		ID:       user.ID,
 	})
 	if err != nil {
-		log.Println(err)
-		utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
+		return utils.SendError(c, fiber.StatusInternalServerError, fiber.ErrInternalServerError.Error(), err)
 	}
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"token": token,
@@ -101,8 +98,7 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 		Username: req.Username,
 	})
 	if err != nil {
-		utils.SendError(c, http.StatusInternalServerError, "", err)
-
+		return utils.SendError(c, http.StatusInternalServerError, "", err)
 	}
 	return c.Status(200).JSON(fiber.Map{})
 }

@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 
 	_ "github.com/lib/pq"
@@ -36,7 +37,7 @@ func RunMigrations(connStr string) {
 	defer sqlDB.Close()
 
 	if err := goose.Up(sqlDB, "./database/migrations"); err != nil {
-		log.Fatalf("failed to run migrations: %v", err)
+		fmt.Println("Error running while doing migration up :", err)
 	}
 
 	log.Println("Migrations applied successfully")

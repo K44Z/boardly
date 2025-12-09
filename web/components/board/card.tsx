@@ -141,7 +141,7 @@ export function Card({ card, onClick, isDragging = false, onAssignUser, onUnassi
       
       <div className="relative z-10">
         <div className="flex items-start justify-between mb-3">
-          <h4 className="font-semibold text-base group-hover:text-primary transition-colors duration-200 leading-snug flex-1">
+          <h4 className="font-semibold text-base group-hover:text-primary transition-colors duration-200 leading-snug flex-1 break-words">
             {localCard.title}
           </h4>
           

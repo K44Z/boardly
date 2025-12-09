@@ -1,6 +1,8 @@
 package dto
 
 import (
+	"database/sql"
+
 	sqlc "github.com/K44Z/boardly/database/generated"
 	"github.com/K44Z/boardly/shared/schemas"
 )
@@ -33,4 +35,11 @@ func NewBoard(data *sqlc.GetBoardWithOwnerRow) *schemas.Board {
 		Name:    data.Name,
 		OwnerID: data.OwnerID,
 	}
+}
+
+func NullStringToPtr(ns sql.NullString) *string {
+	if ns.Valid {
+		return &ns.String
+	}
+	return nil
 }

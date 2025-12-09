@@ -131,7 +131,7 @@ export function List({
         </div>
 
         {/* Cards Container */}
-        <div className="flex-1 space-y-3 overflow-y-auto pr-1 min-h-[200px]">
+        <div className="flex-1 space-y-3 overflow-y-auto overflow-x-hidden pr-1 min-h-[200px]">
           {list.cards.length === 0 ? (
             <div className="h-32 flex items-center justify-center text-muted-foreground text-sm border-2 border-dashed border-border/50 rounded-lg">
               Drop cards here

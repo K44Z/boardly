@@ -231,6 +231,7 @@ SELECT
     b.created_at as board_created_at,
     u.username as owner_username,
     u.email as owner_email,
+    COALESCE(u.profile_image, '') as owner_profile_image,
     l.id as list_id,
     l.name as list_name,
     l.position as list_position,
@@ -254,24 +255,25 @@ ORDER BY l.position ASC, c.position ASC, lb.id ASC
 `
 
 type GetBoardWithListsAndCardsRow struct {
-	BoardID         int32
-	BoardName       string
-	OwnerID         pgtype.Int4
-	BoardCreatedAt  pgtype.Timestamp
-	OwnerUsername   string
-	OwnerEmail      string
-	ListID          pgtype.Int4
-	ListName        string
-	ListPosition    pgtype.Int4
-	ListCreatedAt   pgtype.Timestamp
-	CardID          pgtype.Int4
-	CardTitle       string
-	CardDescription string
-	CardPosition    pgtype.Int4
-	CardCreatedAt   pgtype.Timestamp
-	LabelID         pgtype.Int4
-	LabelName       string
-	LabelColor      string
+	BoardID           int32
+	BoardName         string
+	OwnerID           pgtype.Int4
+	BoardCreatedAt    pgtype.Timestamp
+	OwnerUsername     string
+	OwnerEmail        string
+	OwnerProfileImage string
+	ListID            pgtype.Int4
+	ListName          string
+	ListPosition      pgtype.Int4
+	ListCreatedAt     pgtype.Timestamp
+	CardID            pgtype.Int4
+	CardTitle         string
+	CardDescription   string
+	CardPosition      pgtype.Int4
+	CardCreatedAt     pgtype.Timestamp
+	LabelID           pgtype.Int4
+	LabelName         string
+	LabelColor        string
 }
 
 func (q *Queries) GetBoardWithListsAndCards(ctx context.Context, id int32) ([]GetBoardWithListsAndCardsRow, error) {
@@ -290,6 +292,7 @@ func (q *Queries) GetBoardWithListsAndCards(ctx context.Context, id int32) ([]Ge
 			&i.BoardCreatedAt,
 			&i.OwnerUsername,
 			&i.OwnerEmail,
+			&i.OwnerProfileImage,
 			&i.ListID,
 			&i.ListName,
 			&i.ListPosition,

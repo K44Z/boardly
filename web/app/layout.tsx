@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { Suspense } from "react";
 import { AuthProvider } from "@/contexts/auth-context";
 import { Toaster } from "@/components/ui/toaster";
+import { SidebarWrapper } from "@/components/sidebar-wrapper";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,8 +24,10 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <Suspense fallback={null}>
-            {children}
-            <Analytics />
+            <SidebarWrapper>
+              {children}
+              <Analytics />
+            </SidebarWrapper>
           </Suspense>
           <Toaster />
         </AuthProvider>

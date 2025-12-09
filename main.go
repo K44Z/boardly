@@ -10,6 +10,7 @@ import (
 	"github.com/K44Z/boardly/database"
 	"github.com/K44Z/boardly/database/seeders"
 	"github.com/K44Z/boardly/internal/ai"
+	an "github.com/K44Z/boardly/internal/analytics/services"
 	b "github.com/K44Z/boardly/internal/board/services"
 	c "github.com/K44Z/boardly/internal/card/services"
 	la "github.com/K44Z/boardly/internal/label/services"
@@ -24,12 +25,13 @@ import (
 )
 
 type Services struct {
-	UserService  services.UserService
-	BoardService b.BoardService
-	ListService  l.ListService
-	CardService  c.CardService
-	LabelService la.LabelService
-	AIService    ai.AiService
+	UserService      services.UserService
+	BoardService     b.BoardService
+	ListService      l.ListService
+	CardService      c.CardService
+	LabelService     la.LabelService
+	AIService        ai.AiService
+	AnalyticsService an.AnalyticsService
 }
 
 func loadConfig() (string, string) {
@@ -60,14 +62,14 @@ func setupDatabase(dbUrl, port string) (*schemas.DB, error) {
 }
 
 func initializeServices(db *schemas.DB) (*Services, error) {
-
 	return &Services{
-		UserService:  services.NewUserService(db),
-		BoardService: b.NewBoardService(db),
-		ListService:  l.NewListService(db),
-		CardService:  c.NewCardService(db),
-		LabelService: *la.NewLabelService(db),
-		AIService:    *ai.NewAIService(),
+		UserService:      services.NewUserService(db),
+		BoardService:     b.NewBoardService(db),
+		ListService:      l.NewListService(db),
+		CardService:      c.NewCardService(db),
+		LabelService:     *la.NewLabelService(db),
+		AIService:        *ai.NewAIService(),
+		AnalyticsService: an.NewAnalyticsService(db),
 	}, nil
 }
 
@@ -108,7 +110,17 @@ func SeedDatabase() error {
 		if err := seeder.Clear(ctx); err != nil {
 			return err
 		}
+	} else {
+		hasData, err := seeder.HasData(ctx)
+		if err != nil {
+			return err
+		}
+		if hasData {
+			log.Println("Database already seeded, skipping...")
+			return nil
+		}
 	}
+
 	if err := seeder.Seed(ctx); err != nil {
 		return err
 	}
@@ -124,15 +136,14 @@ func main() {
 	setupMiddleware(app)
 
 	PORT, DbUrl := loadConfig()
-	// err := SeedDatabase()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	err := SeedDatabase()
+	if err != nil {
+		log.Fatal(err)
+	}
 	db, err := setupDatabase(DbUrl, PORT)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
-
 	services, err := initializeServices(db)
 	if err != nil {
 		log.Fatal("Failed to initialize services:", err)

@@ -65,13 +65,15 @@ export default function CardPage({ params }: CardPageProps) {
   const [loadingLabels, setLoadingLabels] = useState(false)
   const [userSearch, setUserSearch] = useState("")
   const [searchResults, setSearchResults] = useState<User[]>([])
-  const [isSearching, setIsSearching] = useState(false)
+  const [boardMembers, setBoardMembers] = useState<User[]>([])
   const [showLabelDropdown, setShowLabelDropdown] = useState(false)
+  const [labelSearch, setLabelSearch] = useState("")
   
   // Text-to-speech state
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
+  const [recordingTarget, setRecordingTarget] = useState<'comment' | 'description' | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -127,34 +129,46 @@ export default function CardPage({ params }: CardPageProps) {
     loadAvailableLabels()
   }, [])
 
-  // Search users
+  // Fetch board members
   useEffect(() => {
-    const searchUsers = async () => {
-      if (!userSearch.trim()) {
-        setSearchResults([])
-        return
-      }
-
-      setIsSearching(true)
+    const fetchBoardMembers = async () => {
       try {
-        const response = await api.searchUsers(userSearch)
-        if (response.data?.users) {
-          // Filter out already assigned users
-          const filtered = response.data.users.filter(user => 
-            !localCard?.assignees?.some(assignee => assignee.id === user.id)
-          )
-          setSearchResults(filtered)
+        const response = await api.getBoardWithLists(parseInt(params.id))
+        if (response.data?.board) {
+          const owner: User = {
+            id: response.data.board.owner_id,
+            username: response.data.board.owner_username,
+            email: response.data.board.owner_email,
+            profile_image: response.data.board.owner_profile_image || "",
+          }
+          const members = response.data.board.members || []
+          const allMembers = [
+            owner,
+            ...members.filter((m) => m.id !== owner.id),
+          ]
+          setBoardMembers(allMembers)
+          setSearchResults(allMembers)
         }
       } catch (err) {
-        console.error("Failed to search users:", err)
-      } finally {
-        setIsSearching(false)
+        console.error("Failed to fetch board members", err)
       }
     }
+    fetchBoardMembers()
+  }, [params.id])
 
-    const debounce = setTimeout(searchUsers, 300)
-    return () => clearTimeout(debounce)
-  }, [userSearch, localCard?.assignees])
+  // Filter users locally
+  useEffect(() => {
+    if (!boardMembers.length) return
+
+    const filtered = boardMembers.filter(user => {
+      const matchesSearch = user.username.toLowerCase().includes(userSearch.toLowerCase()) ||
+                          user.email.toLowerCase().includes(userSearch.toLowerCase())
+      const isNotAssigned = !localCard?.assignees?.some(assignee => assignee.id === user.id)
+      return matchesSearch && isNotAssigned
+    })
+    
+    setSearchResults(filtered)
+  }, [userSearch, boardMembers, localCard?.assignees])
 
   // Cleanup recording on unmount
   useEffect(() => {
@@ -420,8 +434,9 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
     }
   }
 
-  const startRecording = async () => {
+  const startRecording = async (target: 'comment' | 'description') => {
     try {
+      setRecordingTarget(target)
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
@@ -435,7 +450,7 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
-        await transcribeAudio(audioBlob)
+        await transcribeAudio(audioBlob, target)
         
         // Stop all tracks to release microphone
         stream.getTracks().forEach(track => track.stop())
@@ -452,7 +467,7 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
 
       toast({
         title: "Recording Started",
-        description: "Speak now to add your comment",
+        description: "Speak now to add your text",
       })
     } catch (err) {
       console.error('Error starting recording:', err)
@@ -461,6 +476,7 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
         title: "Error",
         description: "Could not access microphone. Please check permissions.",
       })
+      setRecordingTarget(null)
     }
   }
 
@@ -476,7 +492,7 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
     }
   }
 
-  const transcribeAudio = async (audioBlob: Blob) => {
+  const transcribeAudio = async (audioBlob: Blob, target: 'comment' | 'description') => {
     setIsTranscribing(true)
     
     try {
@@ -495,8 +511,11 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
       const data = await response.json()
       
       if (data.text) {
-        // Add transcribed text to comment
-        setNewComment(prev => prev ? `${prev} ${data.text}` : data.text)
+        if (target === 'comment') {
+          setNewComment(prev => prev ? `${prev} ${data.text}` : data.text)
+        } else if (target === 'description') {
+          setLocalCard(prev => prev ? { ...prev, description: prev.description ? `${prev.description} ${data.text}` : data.text } : null)
+        }
         
         toast({
           title: "Transcription Complete",
@@ -514,6 +533,7 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
       })
     } finally {
       setIsTranscribing(false)
+      setRecordingTarget(null)
     }
   }
 
@@ -594,18 +614,74 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
               </div>
               {isEditingDescription ? (
                 <div className="space-y-3">
-                  <Textarea
-                    value={localCard.description || ""}
-                    onChange={(e) => setLocalCard({ ...localCard, description: e.target.value })}
-                    placeholder="Add a more detailed description..."
-                    className="min-h-[120px] bg-background resize-none"
-                    autoFocus
-                  />
+                  <div className="relative">
+                    <Textarea
+                      value={localCard.description || ""}
+                      onChange={(e) => setLocalCard({ ...localCard, description: e.target.value })}
+                      placeholder="Add a more detailed description..."
+                      className="min-h-[120px] bg-background resize-none pr-12"
+                      autoFocus
+                      disabled={isRecording || isTranscribing}
+                    />
+                    {/* Voice Input Button */}
+                    <div className="absolute bottom-3 right-3">
+                      {!isRecording && !isTranscribing ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startRecording('description')}
+                          className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary transition-colors"
+                          title="Record voice description"
+                        >
+                          <Mic className="w-4 h-4" />
+                        </Button>
+                      ) : isRecording && recordingTarget === 'description' ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground font-mono">
+                            {formatRecordingTime(recordingTime)}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={stopRecording}
+                            className="h-8 w-8 p-0 text-red-600 hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors animate-pulse"
+                            title="Stop recording"
+                          >
+                            <Square className="w-4 h-4 fill-current" />
+                          </Button>
+                        </div>
+                      ) : isTranscribing && recordingTarget === 'description' ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* Recording Status Banner for Description */}
+                  {isRecording && recordingTarget === 'description' && (
+                    <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 rounded-lg animate-fade-in">
+                      <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                        Recording... Speak clearly into your microphone
+                      </span>
+                    </div>
+                  )}
+
+                  {isTranscribing && recordingTarget === 'description' && (
+                    <div className="flex items-center gap-3 p-3 bg-primary/10 border border-primary/20 rounded-lg animate-fade-in">
+                      <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                      <span className="text-sm font-medium text-primary">
+                        Converting speech to text...
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => {
                       handleUpdateDescription(localCard.description || "")
                       setIsEditingDescription(false)
-                    }}>
+                    }} disabled={isRecording || isTranscribing}>
                       Save
                     </Button>
                     <Button
@@ -615,6 +691,7 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
                         setLocalCard({ ...localCard, description: card.description })
                         setIsEditingDescription(false)
                       }}
+                      disabled={isRecording || isTranscribing}
                     >
                       Cancel
                     </Button>
@@ -626,7 +703,7 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
                   onClick={() => setIsEditingDescription(true)}
                 >
                   {localCard.description ? (
-                    <p className="leading-relaxed">{localCard.description}</p>
+                    <p className="leading-relaxed break-words whitespace-pre-wrap">{localCard.description}</p>
                   ) : (
                     <p className="text-muted-foreground">Add a more detailed description...</p>
                   )}
@@ -733,13 +810,13 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={startRecording}
+                        onClick={() => startRecording('comment')}
                         className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary transition-colors"
                         title="Record voice message"
                       >
                         <Mic className="w-4 h-4" />
                       </Button>
-                    ) : isRecording ? (
+                    ) : isRecording && recordingTarget === 'comment' ? (
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground font-mono">
                           {formatRecordingTime(recordingTime)}
@@ -754,17 +831,17 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
                           <Square className="w-4 h-4 fill-current" />
                         </Button>
                       </div>
-                    ) : (
+                    ) : isTranscribing && recordingTarget === 'comment' ? (
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
                         <span className="text-xs text-muted-foreground">Processing...</span>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 
                 {/* Recording Status Banner */}
-                {isRecording && (
+                {isRecording && recordingTarget === 'comment' && (
                   <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 rounded-lg animate-fade-in">
                     <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
                     <span className="text-sm font-medium text-red-700 dark:text-red-300">
@@ -776,7 +853,7 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
                   </div>
                 )}
 
-                {isTranscribing && (
+                {isTranscribing && recordingTarget === 'comment' && (
                   <div className="flex items-center gap-3 p-3 bg-primary/10 border border-primary/20 rounded-lg animate-fade-in">
                     <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
                     <span className="text-sm font-medium text-primary">
@@ -835,7 +912,7 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>
-                    <p className="leading-relaxed ml-12">{comment.content}</p>
+                    <p className="leading-relaxed ml-12 break-words whitespace-pre-wrap">{comment.content}</p>
                   </div>
                 ))}
               </div>
@@ -872,76 +949,11 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
                     variant="outline" 
                     size="sm" 
                     className="w-full justify-center bg-transparent border-dashed"
-                    onClick={() => setShowLabelDropdown(!showLabelDropdown)}
+                    onClick={() => setShowLabelDropdown(true)}
                   >
                     <Tag className="w-4 h-4 mr-2" />
                     Manage labels
-                    <ChevronDown className={`w-3 h-3 ml-2 transition-transform ${showLabelDropdown ? 'rotate-180' : ''}`} />
                   </Button>
-
-                  {/* Label Dropdown */}
-                  {showLabelDropdown && (
-                    <div className="absolute top-full left-0 mt-2 w-64 bg-background rounded-lg border border-border shadow-lg z-50">
-                      <div className="p-3">
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-medium text-sm">Manage Labels</h4>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6"
-                            onClick={() => setShowLabelDropdown(false)}
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
-                        </div>
-                        
-                        {loadingLabels ? (
-                          <div className="flex items-center justify-center py-4">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span className="ml-2 text-xs">Loading...</span>
-                          </div>
-                        ) : (
-                          <div className="space-y-1 max-h-48 overflow-y-auto">
-                            {availableLabels.map((label) => {
-                              const isSelected = localCard?.labels?.some(l => l.id === label.id)
-                              return (
-                                <label
-                                  key={label.id}
-                                  className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
-                                >
-                                  <div className="relative">
-                                    <input
-                                      type="checkbox"
-                                      checked={isSelected}
-                                      onChange={() => handleToggleLabel(label)}
-                                      className="sr-only"
-                                    />
-                                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                                      isSelected 
-                                        ? 'bg-primary border-primary text-primary-foreground' 
-                                        : 'border-muted-foreground/30 hover:border-primary/50'
-                                    }`}>
-                                      {isSelected && <Check className="w-2.5 h-2.5" />}
-                                    </div>
-                                  </div>
-                                  <div
-                                    className="w-3 h-3 rounded-full flex-shrink-0"
-                                    style={{ backgroundColor: label.color }}
-                                  />
-                                  <span className="text-sm font-medium flex-1">{label.name}</span>
-                                </label>
-                              )
-                            })}
-                            {availableLabels.length === 0 && (
-                              <p className="text-xs text-muted-foreground text-center py-4">
-                                No labels available
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -1012,6 +1024,85 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
           </div>
         </div>
 
+        {/* Label Management Modal */}
+        {showLabelDropdown && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-background rounded-lg p-6 w-96 max-h-96 overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Manage Labels</h3>
+                <Button variant="ghost" size="icon" onClick={() => setShowLabelDropdown(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search labels..."
+                    value={labelSearch}
+                    onChange={(e) => setLabelSearch(e.target.value)}
+                    className="pl-10"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              
+              {loadingLabels ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="ml-2 text-xs">Loading...</span>
+                </div>
+              ) : (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {availableLabels
+                    .filter(label => label.name.toLowerCase().includes(labelSearch.toLowerCase()))
+                    .sort((a, b) => {
+                      const isSelectedA = localCard?.labels?.some(l => l.id === a.id) ? 1 : 0;
+                      const isSelectedB = localCard?.labels?.some(l => l.id === b.id) ? 1 : 0;
+                      return isSelectedB - isSelectedA;
+                    })
+                    .map((label) => {
+                      const isSelected = localCard?.labels?.some(l => l.id === label.id)
+                      return (
+                        <label
+                          key={label.id}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                        >
+                          <div className="relative">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleLabel(label)}
+                              className="sr-only"
+                            />
+                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                              isSelected 
+                                ? 'bg-primary border-primary text-primary-foreground' 
+                                : 'border-muted-foreground/30 hover:border-primary/50'
+                            }`}>
+                              {isSelected && <Check className="w-2.5 h-2.5" />}
+                            </div>
+                          </div>
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: label.color }}
+                          />
+                          <span className="text-sm font-medium flex-1">{label.name}</span>
+                        </label>
+                      )
+                    })}
+                  {availableLabels.filter(label => label.name.toLowerCase().includes(labelSearch.toLowerCase())).length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      {availableLabels.length === 0 ? "No labels available" : "No matching labels"}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* User Assignment Modal */}
         {showUserModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1036,12 +1127,7 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
               </div>
 
               <div className="space-y-2 max-h-48 overflow-y-auto">
-                {isSearching ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="ml-2 text-sm">Searching...</span>
-                  </div>
-                ) : searchResults.length > 0 ? (
+                {searchResults.length > 0 ? (
                   searchResults.map((user) => (
                     <button
                       key={user.id}
@@ -1069,11 +1155,11 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
                   ))
                 ) : userSearch ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    No users found
+                    No members found matching "{userSearch}"
                   </p>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    Start typing to search for users
+                    All board members are already assigned
                   </p>
                 )}
               </div>

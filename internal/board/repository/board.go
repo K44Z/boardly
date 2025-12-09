@@ -19,6 +19,7 @@ type BoardRepository interface {
 	DeleteBoard(ctx context.Context, id *int32) error
 	CountBoardMembers(ctx context.Context, boardId *int32) (int64, error)
 	GetBoardWithListsAndCards(ctx context.Context, boardId *int32) (*schemas.BoardWithListsAndCards, error)
+	GetBoardMembers(ctx context.Context, boardId *int32) ([]schemas.User, error)
 }
 
 type boardrepo struct {
@@ -223,4 +224,25 @@ func (r *boardrepo) GetBoardWithListsAndCards(ctx context.Context, boardId *int3
 	}
 
 	return board, nil
+}
+
+func (r *boardrepo) GetBoardMembers(ctx context.Context, boardId *int32) ([]schemas.User, error) {
+	members, err := r.queries.GetBoardMembers(ctx, pgtype.Int4{
+		Int32: *boardId,
+		Valid: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var users []schemas.User
+	for _, m := range members {
+		users = append(users, schemas.User{
+			ID:           m.UserID.Int32,
+			Username:     m.Username,
+			Email:        m.Email,
+			ProfileImage: &m.ProfileImage,
+		})
+	}
+	return users, nil
 }
