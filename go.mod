@@ -9,8 +9,8 @@ require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
+	github.com/pressly/goose v2.7.0+incompatible
 	github.com/pressly/goose/v3 v3.26.0
-	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/stretchr/testify v1.11.0
 	golang.org/x/crypto v0.41.0
 )
@@ -28,6 +28,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mfridman/interpolate v0.0.2 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
