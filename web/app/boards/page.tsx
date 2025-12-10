@@ -407,12 +407,6 @@ export default function BoardsPage() {
                           <Clock className="w-3 h-3" />
                           {new Date(board.created_at).toLocaleDateString()}
                         </div>
-                        {board.member_count !== undefined && (
-                          <div className="flex items-center gap-1">
-                            <TrendingUp className="w-3 h-3" />
-                            <span>Active</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>

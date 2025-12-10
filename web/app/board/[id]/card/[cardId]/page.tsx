@@ -619,7 +619,7 @@ Comments: ${comments.map(c => `${c.author}: ${c.content}`).join("\n") || "No com
                       value={localCard.description || ""}
                       onChange={(e) => setLocalCard({ ...localCard, description: e.target.value })}
                       placeholder="Add a more detailed description..."
-                      className="min-h-[120px] bg-background resize-none pr-12"
+                      className="min-h-[240px] bg-background resize-none pr-12"
                       autoFocus
                       disabled={isRecording || isTranscribing}
                     />

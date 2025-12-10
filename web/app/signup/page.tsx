@@ -78,14 +78,6 @@ export default function SignupPage() {
           {/* Signup form */}
           <div className="border border-border rounded-xl p-8 bg-card/50 backdrop-blur-sm">
             <div className="mb-8">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="w-10 h-10 bg-primary rounded-md flex items-center justify-center">
-                  <span className="text-primary-foreground font-bold text-xl">
-                    T
-                  </span>
-                </div>
-                <span className="text-2xl font-bold">Boardly</span>
-              </div>
               <h1 className="text-3xl font-bold mb-2">Create your account</h1>
               <p className="text-muted-foreground">
                 Start organizing your work in minutes

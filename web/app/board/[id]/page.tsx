@@ -657,7 +657,8 @@ export default function BoardPage({ params }: BoardPageProps) {
       }
 
       if (response.data) {
-        const newList = { ...response.data, cards: [] };
+        const listData = (response.data as any).list || response.data;
+        const newList = { ...listData, cards: [] };
         setLists((prev) => [...prev, newList]);
         setShowCreateListModal(false);
         setNewListName("");
@@ -951,9 +952,9 @@ export default function BoardPage({ params }: BoardPageProps) {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-background to-background/95 overflow-hidden">
+    <div className="h-[calc(100vh-1rem)] flex flex-col bg-gradient-to-br from-background to-background/95 overflow-hidden">
       {/* Header */}
-      <header className="sticky top-0 left-0 z-50 w-full border-b border-border/50 backdrop-blur-md bg-background/80 shadow-sm flex-shrink-0">
+      <header className="sticky top-0 left-0 z-40 w-full border-b border-border/50 backdrop-blur-md bg-background/80 shadow-sm flex-shrink-0">
         <div className="mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

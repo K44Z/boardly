@@ -7,9 +7,12 @@ import {
   User,
   LogOut,
   LayoutDashboard,
+  Moon,
+  Sun,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useTheme } from "next-themes"
 
 import {
   Sidebar,
@@ -47,6 +50,7 @@ const items = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { logout, token } = useAuth()
+  const { theme, setTheme } = useTheme()
   const [currentUser, setCurrentUser] = React.useState<UserType | null>(null)
 
   React.useEffect(() => {
@@ -100,6 +104,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              size="lg"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              tooltip="Toggle theme"
+            >
+              <div className="relative flex items-center justify-center size-4">
+                <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              </div>
+              <span>Toggle theme</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
