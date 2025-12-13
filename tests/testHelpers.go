@@ -42,15 +42,13 @@ func SetupApp() (*fiber.App, *schemas.DB) {
 		log.Fatal("error cleaning tables ")
 	}
 
-	// Initialize Services
 	userService := us.NewUserService(db)
-	boardService := bs.NewBoardService(db)
+	boardService := bs.NewBoardService(db, nil)
 	listService := ls.NewListService(db)
-	cardService := cs.NewCardService(db)
+	cardService := cs.NewCardService(db, nil)
 	labelService := las.NewLabelService(db)
 	aiService := ai.NewAIService()
 
-	// Setup Routes
 	ur.NewUserRouter(app, &userService)
 	br.NewBoardRouter(app, &boardService)
 	lr.NewListRouter(app, &listService)

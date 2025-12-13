@@ -18,4 +18,5 @@ func NewBoardRouter(app *fiber.App, s *services.BoardService) {
 	board.Delete("/:id", h.DeleteBoardHandler)
 	board.Get("/:id/full", h.GetFullBoardHandler)
 	board.Get("/:id/token", h.GetAgoraTokenHandler)
+	board.Post("/:id/members", h.AddMemberHandler)
 }

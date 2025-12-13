@@ -15,6 +15,7 @@ import (
 	c "github.com/K44Z/boardly/internal/card/services"
 	la "github.com/K44Z/boardly/internal/label/services"
 	l "github.com/K44Z/boardly/internal/list/services"
+	"github.com/K44Z/boardly/internal/mq"
 	"github.com/K44Z/boardly/internal/user/services"
 	"github.com/K44Z/boardly/shared/schemas"
 	"github.com/gofiber/fiber/v2"
@@ -34,7 +35,7 @@ type Services struct {
 	AnalyticsService an.AnalyticsService
 }
 
-func loadConfig() (string, string) {
+func loadConfig() (string, string, string) {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file:", err)
@@ -50,7 +51,12 @@ func loadConfig() (string, string) {
 		log.Fatal("GOOSE_DBSTRING environment variable is required")
 	}
 
-	return PORT, DbUrl
+	RabbitMQUrl := os.Getenv("RABBITMQ_URL")
+	if RabbitMQUrl == "" {
+		RabbitMQUrl = "amqp://guest:guest@localhost:5672/"
+	}
+
+	return PORT, DbUrl, RabbitMQUrl
 }
 
 func setupDatabase(dbUrl, port string) (*schemas.DB, error) {
@@ -61,12 +67,12 @@ func setupDatabase(dbUrl, port string) (*schemas.DB, error) {
 	return database.ConnectDb(config)
 }
 
-func initializeServices(db *schemas.DB) (*Services, error) {
+func initializeServices(db *schemas.DB, rabbitMQ *mq.RabbitMQ) (*Services, error) {
 	return &Services{
 		UserService:      services.NewUserService(db),
-		BoardService:     b.NewBoardService(db),
+		BoardService:     b.NewBoardService(db, rabbitMQ),
 		ListService:      l.NewListService(db),
-		CardService:      c.NewCardService(db),
+		CardService:      c.NewCardService(db, rabbitMQ),
 		LabelService:     *la.NewLabelService(db),
 		AIService:        *ai.NewAIService(),
 		AnalyticsService: an.NewAnalyticsService(db),
@@ -135,7 +141,7 @@ func main() {
 
 	setupMiddleware(app)
 
-	PORT, DbUrl := loadConfig()
+	PORT, DbUrl, RabbitMQUrl := loadConfig()
 	err := SeedDatabase()
 	if err != nil {
 		log.Fatal(err)
@@ -144,7 +150,16 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
-	services, err := initializeServices(db)
+
+	rabbitMQ, err := mq.NewRabbitMQ(RabbitMQUrl)
+	if err != nil {
+		log.Printf("Failed to connect to RabbitMQ: %v", err)
+		// Continue without RabbitMQ, notifications won't work
+	} else {
+		defer rabbitMQ.Close()
+	}
+
+	services, err := initializeServices(db, rabbitMQ)
 	if err != nil {
 		log.Fatal("Failed to initialize services:", err)
 	}

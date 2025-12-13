@@ -2,8 +2,11 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/K44Z/boardly/internal/card/repository"
+	"github.com/K44Z/boardly/internal/mq"
+	userRepo "github.com/K44Z/boardly/internal/user/repository"
 	"github.com/K44Z/boardly/shared/schemas"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -32,12 +35,16 @@ type CardService interface {
 }
 
 type cardService struct {
-	repo repository.CardRepository
+	repo     repository.CardRepository
+	userRepo userRepo.UserRepository
+	mq       *mq.RabbitMQ
 }
 
-func NewCardService(db *schemas.DB) CardService {
+func NewCardService(db *schemas.DB, mq *mq.RabbitMQ) CardService {
 	return &cardService{
-		repo: repository.NewCardRepository(db),
+		repo:     repository.NewCardRepository(db),
+		userRepo: userRepo.NewUserRepository(db),
+		mq:       mq,
 	}
 }
 
@@ -110,7 +117,36 @@ func (s *cardService) CountCardsByList(ctx context.Context, listID int32) (int64
 }
 
 func (s *cardService) AssignUserToCard(ctx context.Context, userId int32, cardId int32) error {
-	return s.repo.AssignUser(ctx, userId, cardId)
+	err := s.repo.AssignUser(ctx, userId, cardId)
+	if err != nil {
+		return err
+	}
+
+	card, err := s.repo.GetCardWithDetails(ctx, cardId)
+	if err != nil {
+		fmt.Printf("Failed to fetch card details for notification: %v\n", err)
+		return nil
+	}
+
+	user, err := s.userRepo.GetUserById(ctx, &userId)
+	if err != nil {
+		fmt.Printf("Failed to fetch user for notification: %v\n", err)
+		return nil
+	}
+
+	if s.mq != nil {
+		notification := mq.EmailNotification{
+			UserID:  userId,
+			BoardID: card.BoardID,
+			Email:   user.Email,
+			Message: fmt.Sprintf("You have been assigned to card '%s' in list '%s'", card.Title, card.ListName),
+		}
+		if err := s.mq.PublishAssignment(ctx, notification); err != nil {
+			fmt.Printf("Failed to publish notification: %v\n", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *cardService) GetAllCardAssignees(ctx context.Context, cardId int32) ([]schemas.User, error) {

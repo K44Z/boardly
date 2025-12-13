@@ -207,3 +207,35 @@ func (h *BoardHandler) GetAgoraTokenHandler(c *fiber.Ctx) error {
 		"channel": channelName,
 	})
 }
+
+type AddMemberRequest struct {
+	UserID int32 `json:"user_id" validate:"required"`
+}
+
+func (h *BoardHandler) AddMemberHandler(c *fiber.Ctx) error {
+	boardId, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid board ID",
+		})
+	}
+	bid := int32(boardId)
+
+	req := &AddMemberRequest{}
+	if err := c.BodyParser(req); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body: " + err.Error(),
+		})
+	}
+
+	err = h.service.AddMember(c.Context(), &bid, &req.UserID)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to add member: " + err.Error(),
+		})
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"message": "Member added successfully",
+	})
+}

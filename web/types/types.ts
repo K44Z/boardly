@@ -1,5 +1,3 @@
-// Board types that match Go schemas
-
 export interface User {
   id: number;
   username: string;

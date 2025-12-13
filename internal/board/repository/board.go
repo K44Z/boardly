@@ -20,6 +20,7 @@ type BoardRepository interface {
 	CountBoardMembers(ctx context.Context, boardId *int32) (int64, error)
 	GetBoardWithListsAndCards(ctx context.Context, boardId *int32) (*schemas.BoardWithListsAndCards, error)
 	GetBoardMembers(ctx context.Context, boardId *int32) ([]schemas.User, error)
+	AddMember(ctx context.Context, boardId *int32, userId *int32) error
 }
 
 type boardrepo struct {
@@ -245,4 +246,22 @@ func (r *boardrepo) GetBoardMembers(ctx context.Context, boardId *int32) ([]sche
 		})
 	}
 	return users, nil
+}
+
+func (r *boardrepo) AddMember(ctx context.Context, boardId *int32, userId *int32) error {
+	_, err := r.queries.CreateMembership(ctx, sqlc.CreateMembershipParams{
+		BoardID: pgtype.Int4{
+			Int32: *boardId,
+			Valid: true,
+		},
+		UserID: pgtype.Int4{
+			Int32: *userId,
+			Valid: true,
+		},
+		Role: "member",
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }

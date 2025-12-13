@@ -48,7 +48,6 @@ export default function SignupPage() {
         description: "Account created successfully! Please log in.",
       });
       
-      // Redirect to login page after successful registration
       setTimeout(() => {
         router.push("/login");
       }, 1000);

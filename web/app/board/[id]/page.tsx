@@ -111,7 +111,6 @@ export default function BoardPage({ params }: BoardPageProps) {
   const [listToDelete, setListToDelete] = useState<number | null>(null);
   const [showDeleteListDialog, setShowDeleteListDialog] = useState(false);
 
-  // Board actions state
   const [isStarred, setIsStarred] = useState(false);
   const [isEditingBoard, setIsEditingBoard] = useState(false);
   const [newBoardTitle, setNewBoardTitle] = useState("");
@@ -273,7 +272,6 @@ export default function BoardPage({ params }: BoardPageProps) {
   const join = async () => {
     setIsConnecting(true);
     try {
-      // Add a small delay for the animation to be appreciated
       await new Promise((resolve) => setTimeout(resolve, 1200));
 
       const track = await AgoraRTC.createMicrophoneAudioTrack();
@@ -282,7 +280,6 @@ export default function BoardPage({ params }: BoardPageProps) {
       setJoined(true);
       joinedRef.current = true;
 
-      // Subscribe to existing users
       client.remoteUsers.forEach(async (user) => {
         if (user.hasAudio) {
           await client.subscribe(user, "audio");
@@ -314,7 +311,6 @@ export default function BoardPage({ params }: BoardPageProps) {
       }
       await client.unpublish();
 
-      // Unsubscribe from all remote users
       client.remoteUsers.forEach(async (user) => {
         if (user.hasAudio) {
           await client.unsubscribe(user, "audio");

@@ -23,7 +23,6 @@ export default function ProfilePage() {
       if (!token) return;
       
       const decoded = parseJwt(token);
-      // The JWT uses 'sub' for the user ID
       const userId = decoded?.sub || decoded?.id;
       
       if (!decoded || !userId) {

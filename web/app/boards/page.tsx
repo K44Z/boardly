@@ -235,7 +235,6 @@ export default function BoardsPage() {
   const starredBoards = filteredBoards.filter((board) => false); // TODO: Add starring feature
   const recentBoards = filteredBoards;
 
-  // Generate avatar colors based on username
   const getAvatarColor = (name: string) => {
     if (!name) return 'bg-gray-500';
     const colors = [
