@@ -10,6 +10,10 @@ func NewCardRouter(app *fiber.App, s *services.CardService) {
 	handler := handlers.NewCardHandler(s)
 	cards := app.Group("/api/cards")
 
+	cards.Get("/overdue", handler.GetOverdueCardsHandler)
+	cards.Get("/due-soon", handler.GetCardsDueSoonHandler)
+	cards.Get("/search", handler.SearchCardsHandler)
+
 	// CRUD operations
 	cards.Post("/", handler.CreateCardHandler)
 	cards.Get("/:id", handler.GetCardByIDHandler)
@@ -21,11 +25,6 @@ func NewCardRouter(app *fiber.App, s *services.CardService) {
 	// List/Board operations
 	cards.Get("/list/:listId", handler.GetCardsByListHandler)
 	cards.Get("/board/:boardId", handler.GetCardsByBoardHandler)
-
-	// Special queries
-	cards.Get("/overdue", handler.GetOverdueCardsHandler)
-	cards.Get("/due-soon", handler.GetCardsDueSoonHandler)
-	cards.Get("/search", handler.SearchCardsHandler)
 
 	//assignments
 	cards.Post("/:id/assign", handler.AssignUserToCardHandler)

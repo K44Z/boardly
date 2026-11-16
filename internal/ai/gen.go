@@ -5,10 +5,18 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/K44Z/boardly/shared/utils"
 	"github.com/gofiber/fiber/v2"
 )
+
+func ollamaURL() string {
+	if u := os.Getenv("OLLAMA_URL"); u != "" {
+		return u
+	}
+	return "http://localhost:11434"
+}
 
 func (a *AiService) PromptOllama(model, prompt string) (*OllamaResponse, error) {
 	if model == "" {
@@ -23,7 +31,7 @@ func (a *AiService) PromptOllama(model, prompt string) (*OllamaResponse, error) 
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("POST", "http://localhost:11434/api/generate", bytes.NewBuffer(payload))
+	req, err := http.NewRequest("POST", ollamaURL()+"/api/generate", bytes.NewBuffer(payload))
 	if err != nil {
 		return nil, err
 	}
@@ -32,6 +40,7 @@ func (a *AiService) PromptOllama(model, prompt string) (*OllamaResponse, error) 
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 	resBytes, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err

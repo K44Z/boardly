@@ -80,8 +80,12 @@ func initializeServices(db *schemas.DB, rabbitMQ *mq.RabbitMQ) (*Services, error
 }
 
 func setupMiddleware(app *fiber.App) {
+	origin := os.Getenv("CORS_ORIGIN")
+	if origin == "" {
+		origin = "http://localhost:3000"
+	}
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000",
+		AllowOrigins:     origin,
 		AllowCredentials: true,
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowMethods:     "*",
@@ -139,9 +143,8 @@ func main() {
 	app := fiber.New()
 	app.Static("/static", "./static")
 
-	setupMiddleware(app)
-
 	PORT, DbUrl, RabbitMQUrl := loadConfig()
+	setupMiddleware(app)
 	err := SeedDatabase()
 	if err != nil {
 		log.Fatal(err)
