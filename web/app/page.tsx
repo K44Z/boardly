@@ -2,8 +2,9 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Landscape } from "@/components/landing/landscape";
 import { label, textLink, themeClass, themeStyle } from "@/components/landing/theme";
-import { ActivityFeed } from "@/components/landing/activity-feed";
 import { CallVisual } from "@/components/landing/call-visual";
+import { SummaryVisual } from "@/components/landing/summary-visual";
+import { ReplayVisual } from "@/components/landing/replay-visual";
 import { Connectors } from "@/components/landing/connectors";
 import { Parallax, Reveal, WordReveal } from "@/components/landing/motion";
 
@@ -34,10 +35,6 @@ const helpers = [
     body: "Summaries of your cards and lists, written for you.",
   },
   {
-    title: "Notifications",
-    body: "Told when it matters, and only then.",
-  },
-  {
     title: "Transcription",
     body: "Turn a voice note into tasks.",
   },
@@ -45,21 +42,10 @@ const helpers = [
     title: "Calls",
     body: "Start a call from the board and talk it through, without leaving the work.",
   },
-];
-
-const summaries = [
-  "Project Alpha launch requirements…",
-  "Q4 marketing strategy overview…",
-  "User feedback analysis report…",
-];
-
-const activity = [
-  { user: "Alice", text: "moved Design System", img: "/user-1.jpg" },
-  { user: "Bob", text: "commented on API Integration", img: "/user-2.jpg" },
-  { user: "Charlie", text: "completed User Auth", img: "/user-3.jpg" },
-  { user: "Diana", text: "attached a file to Landing Page", img: "/user-4.jpg" },
-  { user: "Alice", text: "assigned Bob to Onboarding", img: "/user-1.jpg" },
-  { user: "Charlie", text: "set a due date on Billing", img: "/user-3.jpg" },
+  {
+    title: "Replay",
+    body: "Scrub back through the week and watch the board rebuild itself.",
+  },
 ];
 
 const values = [
@@ -79,16 +65,7 @@ const values = [
 
 const visual = [
   // Summaries
-  <ul key="s" className="flex flex-col divide-y divide-[var(--ink)]/10">
-    {summaries.map((t, i) => (
-      <li key={t} className="py-3">
-        <p className={cn(label, "mb-1 text-[var(--muted)]")}>Summary {i + 1}</p>
-        <p className="text-xl italic leading-snug text-[var(--ink)]/80">{t}</p>
-      </li>
-    ))}
-  </ul>,
-  // Notifications
-  <ActivityFeed key="n" items={activity} />,
+  <SummaryVisual key="s" />,
   // Transcription
   <div key="t" className="flex h-40 items-center justify-center gap-1.5">
     {[40, 70, 100, 60, 80, 50, 90, 30, 65, 45].map((h, i) => (
@@ -101,6 +78,8 @@ const visual = [
   </div>,
   // Calls
   <CallVisual key="c" />,
+  // Replay
+  <ReplayVisual key="r" />,
 ];
 
 export default function LandingPage() {
