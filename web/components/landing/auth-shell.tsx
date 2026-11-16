@@ -28,9 +28,6 @@ export function AuthShell({
         >
           Boardly
         </Link>
-        <p className="absolute bottom-12 left-10 right-10 z-10 max-w-xs rounded-sm bg-[var(--paper)]/80 p-4 backdrop-blur-sm text-3xl font-light italic leading-tight">
-          Boards hold lists. Lists hold cards.
-        </p>
       </div>
 
       <div className="flex min-h-screen flex-col px-6 py-8 md:px-16">

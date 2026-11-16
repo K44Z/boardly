@@ -2,6 +2,9 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Landscape } from "@/components/landing/landscape";
 import { label, textLink, themeClass, themeStyle } from "@/components/landing/theme";
+import { ActivityFeed } from "@/components/landing/activity-feed";
+import { CallVisual } from "@/components/landing/call-visual";
+import { Connectors } from "@/components/landing/connectors";
 import { Parallax, Reveal, WordReveal } from "@/components/landing/motion";
 
 const chapters = [
@@ -23,6 +26,81 @@ const chapters = [
     art: "notice" as const,
     body: "Cards per list and recent activity, to see where things pile up. Speak a note and Whisper writes it down. Prompts go to a model on your own machine.",
   },
+];
+
+const helpers = [
+  {
+    title: "Summaries",
+    body: "Summaries of your cards and lists, written for you.",
+  },
+  {
+    title: "Notifications",
+    body: "Told when it matters, and only then.",
+  },
+  {
+    title: "Transcription",
+    body: "Turn a voice note into tasks.",
+  },
+  {
+    title: "Calls",
+    body: "Start a call from the board and talk it through, without leaving the work.",
+  },
+];
+
+const summaries = [
+  "Project Alpha launch requirements…",
+  "Q4 marketing strategy overview…",
+  "User feedback analysis report…",
+];
+
+const activity = [
+  { user: "Alice", text: "moved Design System", img: "/user-1.jpg" },
+  { user: "Bob", text: "commented on API Integration", img: "/user-2.jpg" },
+  { user: "Charlie", text: "completed User Auth", img: "/user-3.jpg" },
+  { user: "Diana", text: "attached a file to Landing Page", img: "/user-4.jpg" },
+  { user: "Alice", text: "assigned Bob to Onboarding", img: "/user-1.jpg" },
+  { user: "Charlie", text: "set a due date on Billing", img: "/user-3.jpg" },
+];
+
+const values = [
+  {
+    title: "Free & open source",
+    body: "Transparency at its core. Community-driven development that stays free.",
+  },
+  {
+    title: "AI productivity",
+    body: "Built-in tools to summarize, generate and organize your work.",
+  },
+  {
+    title: "Simple & elegant",
+    body: "A clean, distraction-free interface made for focus. No bloat.",
+  },
+];
+
+const visual = [
+  // Summaries
+  <ul key="s" className="flex flex-col divide-y divide-[var(--ink)]/10">
+    {summaries.map((t, i) => (
+      <li key={t} className="py-3">
+        <p className={cn(label, "mb-1 text-[var(--muted)]")}>Summary {i + 1}</p>
+        <p className="text-xl italic leading-snug text-[var(--ink)]/80">{t}</p>
+      </li>
+    ))}
+  </ul>,
+  // Notifications
+  <ActivityFeed key="n" items={activity} />,
+  // Transcription
+  <div key="t" className="flex h-40 items-center justify-center gap-1.5">
+    {[40, 70, 100, 60, 80, 50, 90, 30, 65, 45].map((h, i) => (
+      <span
+        key={i}
+        className="w-1 animate-wave rounded-full bg-[var(--ink)]/60"
+        style={{ height: `${h}%`, animationDelay: `${i * 0.1}s` }}
+      />
+    ))}
+  </div>,
+  // Calls
+  <CallVisual key="c" />,
 ];
 
 export default function LandingPage() {
@@ -136,6 +214,52 @@ export default function LandingPage() {
             </Reveal>
           </section>
         ))}
+
+        {/* Helpers */}
+        <section className="mx-auto max-w-7xl px-6 pb-40 md:px-10">
+          <Reveal>
+            <p className={cn(label, "mb-6 text-[var(--muted)]")}>And besides</p>
+            <h2 className="mb-16 max-w-2xl text-5xl font-light leading-none md:text-7xl">
+              Small <em>helpers</em>, kept in the margins.
+            </h2>
+          </Reveal>
+          <div className="grid gap-x-12 gap-y-16 md:grid-cols-2">
+            {helpers.map((h, i) => (
+              <Reveal key={h.title} delay={i * 0.1} className="border-t border-[var(--ink)] pt-6">
+                <h3 className="mb-3 text-4xl font-light italic">{h.title}</h3>
+                <p className="mb-8 min-h-14 text-xl leading-snug text-[var(--ink)]/75">{h.body}</p>
+                {visual[i]}
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
+        {/* Connectors */}
+        <section className="mx-auto grid max-w-7xl items-center gap-12 px-6 pb-40 md:grid-cols-[1fr_1.2fr] md:gap-24 md:px-10">
+          <Reveal className="max-w-md">
+            <p className={cn(label, "mb-8 text-[var(--muted)]")}>Connectors</p>
+            <h2 className="mb-6 text-6xl font-light italic md:text-7xl">Bring your tools along</h2>
+            <p className="text-xl leading-relaxed text-[var(--ink)]/75">
+              Canvas, GitHub, Notion, Obsidian, Slack and Microsoft 365 meet in one board, so the work
+              doesn&apos;t have to live in five places.
+            </p>
+          </Reveal>
+          <Reveal delay={0.15}>
+            <Connectors />
+          </Reveal>
+        </section>
+
+        {/* Values */}
+        <section className="mx-auto max-w-7xl px-6 pb-40 md:px-10">
+          <div className="grid gap-12 md:grid-cols-3 md:gap-16">
+            {values.map((v, i) => (
+              <Reveal key={v.title} delay={i * 0.1} className="border-t border-[var(--ink)]/30 pt-6">
+                <h3 className="mb-3 text-3xl font-medium">{v.title}</h3>
+                <p className="text-xl leading-snug text-[var(--ink)]/75">{v.body}</p>
+              </Reveal>
+            ))}
+          </div>
+        </section>
 
         {/* Close */}
         <section className="relative flex min-h-[90vh] items-center justify-center overflow-hidden">
